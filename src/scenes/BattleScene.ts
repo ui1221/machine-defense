@@ -120,6 +120,7 @@ export class BattleScene extends Phaser.Scene {
         const e = new Enemy(this, clampedX, SPAWN_Y + Math.random() * 40, cfg)
         this.add.existing(e)
         this.enemies.add(e)
+        if (cfg.abilities?.includes('boss')) this.showBossArrival(cfg.name)
       }
     }
 
@@ -144,7 +145,9 @@ export class BattleScene extends Phaser.Scene {
     }
 
     for (const e of enemyList) {
-      if (e.active) e.update(now, scaledDelta)
+      if (!e.active) continue
+      e.update(now, scaledDelta)
+      e.tryHealNearby(now, enemyList)
     }
 
     // キャラ攻撃 + クールダウン表示
@@ -349,6 +352,38 @@ export class BattleScene extends Phaser.Scene {
     this.tweens.add({
       targets: txt, y: y - 60, alpha: 0, duration: 1200,
       ease: 'Sine.easeOut', onComplete: () => txt.destroy(),
+    })
+  }
+
+  private showBossArrival(name: string) {
+    const band = this.add.rectangle(GAME_W / 2, 130, GAME_W - 36, 58, 0x2b120f, 0.88)
+      .setStrokeStyle(2, 0xff9955)
+      .setDepth(40)
+    const title = this.add.text(GAME_W / 2, 118, 'BOSS APPROACH', {
+      fontSize: '24px',
+      color: '#ffcc88',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(41)
+    const sub = this.add.text(GAME_W / 2, 143, name, {
+      fontSize: '15px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(41)
+
+    this.tweens.add({
+      targets: [band, title, sub],
+      alpha: 0,
+      delay: 1100,
+      duration: 700,
+      onComplete: () => {
+        band.destroy()
+        title.destroy()
+        sub.destroy()
+      },
     })
   }
 

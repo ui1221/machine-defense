@@ -95,6 +95,12 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     description: '軽く速い撹乱役。',
     hp: 8, speed: 20, damage: 2, expReward: 3, size: 13, color: 0x66ffee,
   },
+  medic: {
+    id: 'medic', name: '修復型', emoji: '✚',
+    description: '本人は脆いが、近くの敵を少しずつ修復する。',
+    hp: 12, speed: 10, damage: 2, expReward: 7, size: 16, color: 0x77ffaa,
+    abilities: ['heal_aura'],
+  },
   mass: {
     id: 'mass', name: '質量型', emoji: '⬛',
     description: '超低速、高HP、高攻撃力。',
@@ -105,5 +111,11 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     description: '軽い装甲を持ち、HPが減ると加速する。',
     hp: 70, speed: 12, damage: 16, expReward: 22, size: 24, color: 0xffdd66,
     abilities: ['elite'],
+  },
+  boss_siege: {
+    id: 'boss_siege', name: '大型制圧型', emoji: '⬣',
+    description: '区画を制圧するための大型機。遅いが、非常に高い耐久と強い攻撃を持つ。',
+    hp: 320, speed: 4, damage: 30, expReward: 80, size: 42, color: 0xff8844,
+    abilities: ['warning_attack', 'boss'],
   },
 }

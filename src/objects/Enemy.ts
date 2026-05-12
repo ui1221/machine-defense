@@ -4,6 +4,9 @@ import { BARRICADE_Y } from '../constants'
 
 const ATTACK_DELAY = 800   // バリケード到達から最初の攻撃まで(ms)
 const ATTACK_COOLDOWN = 1200  // 攻撃間のクールタイム(ms)
+const HEAL_INTERVAL = 2400
+const HEAL_RADIUS = 92
+const HEAL_AMOUNT = 5
 
 export class Enemy extends Phaser.GameObjects.Container {
   hp: number
@@ -21,8 +24,9 @@ export class Enemy extends Phaser.GameObjects.Container {
   private arrivedTime = 0
   private attackWarningShown = false
   private charged = false
+  private lastHealTime = 0
 
-  private label: Phaser.GameObjects.Text
+  private label: Phaser.GameObjects.Text | Phaser.GameObjects.Sprite
   private hpBar: Phaser.GameObjects.Rectangle
   private bodyCircle: Phaser.GameObjects.Arc
 
@@ -37,13 +41,24 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.expReward = cfg.expReward
     this.size = cfg.size
 
-    this.bodyCircle = scene.add.circle(0, 2, cfg.size + 4, cfg.color ?? 0x667788, 0.35)
-    this.label = scene.add.text(0, 0, cfg.emoji, { fontSize: '30px' }).setOrigin(0.5)
-    const hpBg = scene.add.rectangle(0, -24, 32, 4, 0x333333)
-    this.hpBar = scene.add.rectangle(0, -24, 32, 4, 0xff4444)
+    const isBoss = this.hasAbility('boss')
+    const hpBarWidth = isBoss ? 92 : 32
+    const hpBarY = isBoss ? -48 : -24
+    const fontSize = isBoss ? '52px' : '30px'
+
+    this.bodyCircle = scene.add.circle(0, 2, cfg.size + (isBoss ? 10 : 4), cfg.color ?? 0x667788, isBoss ? 0.52 : 0.35)
+    if (cfg.id === 'basic') {
+      const sprite = scene.add.sprite(0, 10, 'mass_robot', 56).setOrigin(0.5).setScale(0.34)
+      sprite.play('mass_robot_front_walk')
+      this.label = sprite
+    } else {
+      this.label = scene.add.text(0, 0, cfg.emoji, { fontSize }).setOrigin(0.5)
+    }
+    const hpBg = scene.add.rectangle(0, hpBarY, hpBarWidth, isBoss ? 8 : 4, 0x333333)
+    this.hpBar = scene.add.rectangle(0, hpBarY, hpBarWidth, isBoss ? 8 : 4, isBoss ? 0xffaa44 : 0xff4444)
 
     this.add([this.bodyCircle, this.label, hpBg, this.hpBar])
-    this.setDepth(10)
+    this.setDepth(isBoss ? 14 : 10)
   }
 
   takeDamage(amount: number): boolean {
@@ -105,6 +120,45 @@ export class Enemy extends Phaser.GameObjects.Container {
     return true
   }
 
+  tryHealNearby(now: number, allies: Enemy[]): boolean {
+    if (!this.hasAbility('heal_aura')) return false
+    if (now - this.lastHealTime < HEAL_INTERVAL) return false
+
+    const targets = allies.filter((enemy) => {
+      if (!enemy.active || enemy === this || enemy.hp >= enemy.maxHp) return false
+      const dx = enemy.x - this.x
+      const dy = enemy.y - this.y
+      return dx * dx + dy * dy <= HEAL_RADIUS * HEAL_RADIUS
+    })
+    if (targets.length === 0) return false
+
+    this.lastHealTime = now
+    for (const target of targets.slice(0, 3)) {
+      target.heal(HEAL_AMOUNT)
+    }
+    this.showHealPulse()
+    return true
+  }
+
+  heal(amount: number) {
+    this.hp = Math.min(this.maxHp, this.hp + amount)
+    this.hpBar.setScale(this.hp / this.maxHp, 1)
+    const txt = this.scene.add.text(this.x, this.y - 28, `+${amount}`, {
+      fontSize: '12px',
+      color: '#88ffbb',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(28)
+    this.scene.tweens.add({
+      targets: txt,
+      y: txt.y - 24,
+      alpha: 0,
+      duration: 520,
+      onComplete: () => txt.destroy(),
+    })
+  }
+
   hasAbility(id: string) {
     return this.config.abilities?.includes(id as never) ?? false
   }
@@ -152,6 +206,20 @@ export class Enemy extends Phaser.GameObjects.Container {
       alpha: 0,
       duration: 520,
       onComplete: () => warn.destroy(),
+    })
+  }
+
+  private showHealPulse() {
+    const ring = this.scene.add.circle(this.x, this.y, HEAL_RADIUS * 0.65, 0x55ff99, 0.08)
+      .setStrokeStyle(2, 0x88ffbb, 0.8)
+      .setDepth(8)
+    this.scene.tweens.add({
+      targets: ring,
+      scaleX: 1.45,
+      scaleY: 1.45,
+      alpha: 0,
+      duration: 520,
+      onComplete: () => ring.destroy(),
     })
   }
 }

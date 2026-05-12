@@ -1,5 +1,5 @@
 export type AttackType = 'bullet' | 'burst' | 'field' | 'slash'
-export type EnemyAbility = 'armor' | 'charge' | 'split' | 'warning_attack' | 'elite'
+export type EnemyAbility = 'armor' | 'charge' | 'split' | 'warning_attack' | 'elite' | 'boss' | 'heal_aura'
 
 export type AttackResult =
   | { kind: 'bullet'; tx: number; ty: number }

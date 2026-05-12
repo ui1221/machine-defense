@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { GAME_W, GAME_H } from './constants'
+import { BootScene } from './scenes/BootScene'
 import { HomeScene } from './scenes/HomeScene'
 import { BattleScene } from './scenes/BattleScene'
 import { BattleUIScene } from './scenes/BattleUIScene'
@@ -11,7 +12,7 @@ const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean
   height: GAME_H,
   backgroundColor: '#111122',
   parent: document.body,
-  scene: [HomeScene, BattleScene, BattleUIScene, ResultScene],
+  scene: [BootScene, HomeScene, BattleScene, BattleUIScene, ResultScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
