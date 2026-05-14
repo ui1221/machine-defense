@@ -3,8 +3,14 @@ import { GAME_W, GAME_H } from '../constants'
 import { STAGES } from '../data/stages'
 import { CHARACTERS } from '../data/characters'
 import { RARITY_COLORS, WEAPONS } from '../data/weapons'
-import { addCredits, addOwnedWeapons, markStageCleared } from '../systems/SaveData'
+import { addCredits, addOwnedWeapons, loadSave, markStageCleared } from '../systems/SaveData'
 import type { CharacterDamageStat } from '../types'
+
+const SIDE_FRAME_X = GAME_W - 100
+const SIDE_FRAME_Y = 292
+const SIDE_FRAME_W = 150
+const SIDE_FRAME_H = 230
+const SIDE_FRAME_FILL = 0x101827
 
 interface ResultData {
   victory: boolean
@@ -21,7 +27,8 @@ export class ResultScene extends Phaser.Scene {
   create(data: ResultData) {
     const { victory, stageId, killCount, level, droppedWeapons = [], damageStats = [] } = data
     const stage = STAGES.find(s => s.id === stageId) ?? STAGES[0]
-    const creditReward = this.calcCreditReward(victory, stage.difficulty, killCount, stageId)
+    const researchBonus = 1 + loadSave().upgrades.researchLevel * 0.02
+    const creditReward = Math.round(this.calcCreditReward(victory, stage.difficulty, killCount, stageId) * researchBonus)
 
     if (victory) markStageCleared(stageId)
     if (droppedWeapons.length > 0) addOwnedWeapons(droppedWeapons)
@@ -50,22 +57,21 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private buildCharacterArea(victory: boolean) {
-    const ch = CHARACTERS.assault
-    const portraitX = GAME_W - 126
-    const portraitY = 292
+    const portraitX = SIDE_FRAME_X
+    const portraitY = SIDE_FRAME_Y
+    const accent = victory ? 0xffdd66 : 0x774455
 
-    this.add.rectangle(portraitX, portraitY, 150, 250, 0x101827)
-      .setStrokeStyle(2, victory ? 0xffdd66 : 0x774455)
-    this.add.circle(portraitX, portraitY - 28, 58, victory ? 0x334466 : 0x332233, 0.8)
-    this.add.text(portraitX, portraitY - 34, ch.emoji, {
-      fontSize: '72px',
-    }).setOrigin(0.5)
-    this.add.text(portraitX, portraitY + 50, ch.name, {
+    this.add.rectangle(portraitX, portraitY, SIDE_FRAME_W, SIDE_FRAME_H, SIDE_FRAME_FILL)
+      .setStrokeStyle(2, accent)
+    this.add.rectangle(portraitX, portraitY - SIDE_FRAME_H / 2 + 2, SIDE_FRAME_W - 12, 3, accent, 0.75)
+    this.add.image(portraitX, portraitY + 102, 'home_portrait')
+      .setScale(0.34)
+    this.add.text(portraitX, portraitY + 82, 'アサルト型', {
       fontSize: '16px',
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5)
-    this.add.text(portraitX, portraitY + 76, '立ち絵差し替え枠', {
+    this.add.text(portraitX, portraitY + 106, '立ち絵仮置き', {
       fontSize: '11px',
       color: '#667788',
     }).setOrigin(0.5)

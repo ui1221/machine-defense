@@ -2,12 +2,28 @@ import type { GameSave, OwnedWeapon, PermanentUpgrades } from '../types'
 import { WEAPONS } from '../data/weapons'
 
 export const SAVE_KEY = 'td_save'
+const RETIRED_CHARACTER_IDS = new Set(['rapid'])
 
 export const DEFAULT_UPGRADES: PermanentUpgrades = {
   assaultAtkLevel: 0,
   assaultCooldownLevel: 0,
+  railgunAtkLevel: 0,
+  railgunCooldownLevel: 0,
+  rapidAtkLevel: 0,
+  rapidCooldownLevel: 0,
+  bladeAtkLevel: 0,
+  bladeCooldownLevel: 0,
+  fieldAtkLevel: 0,
+  fieldCooldownLevel: 0,
+  beamAtkLevel: 0,
+  beamCooldownLevel: 0,
+  orbAtkLevel: 0,
+  orbCooldownLevel: 0,
+  stunAtkLevel: 0,
+  stunCooldownLevel: 0,
   barricadeHpLevel: 0,
   equipmentLevel: 0,
+  researchLevel: 0,
 }
 
 export function loadSave(): GameSave {
@@ -51,20 +67,28 @@ export function addOwnedWeapons(weaponIds: string[]): GameSave {
 }
 
 export function normalizeSave(raw: Partial<GameSave>): GameSave {
+  const rawUpgrades = (raw.upgrades ?? {}) as Partial<PermanentUpgrades>
+  const assaultAtkLevel = Math.max(rawUpgrades.assaultAtkLevel ?? 0, rawUpgrades.rapidAtkLevel ?? 0)
+  const assaultCooldownLevel = Math.max(rawUpgrades.assaultCooldownLevel ?? 0, rawUpgrades.rapidCooldownLevel ?? 0)
+
   return {
     clearedStages: Array.isArray(raw.clearedStages) ? raw.clearedStages : [],
     ownedWeapons: Array.isArray(raw.ownedWeapons) ? raw.ownedWeapons.map(normalizeOwnedWeapon) : [],
     credits: typeof raw.credits === 'number' ? raw.credits : 0,
     upgrades: {
       ...DEFAULT_UPGRADES,
-      ...(raw.upgrades ?? {}),
+      ...rawUpgrades,
+      assaultAtkLevel,
+      assaultCooldownLevel,
+      rapidAtkLevel: 0,
+      rapidCooldownLevel: 0,
     },
     debugUnlockAllStages: raw.debugUnlockAllStages === true,
   }
 }
 
 export function upgradeCost(level: number) {
-  return 80 + level * 60
+  return 80 + level * 65
 }
 
 function normalizeOwnedWeapon(raw: Partial<OwnedWeapon>): OwnedWeapon {
@@ -72,7 +96,7 @@ function normalizeOwnedWeapon(raw: Partial<OwnedWeapon>): OwnedWeapon {
   return {
     uid: typeof raw.uid === 'string' ? raw.uid : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     weaponId,
-    equippedCharId: typeof raw.equippedCharId === 'string' ? raw.equippedCharId : null,
+    equippedCharId: typeof raw.equippedCharId === 'string' && !RETIRED_CHARACTER_IDS.has(raw.equippedCharId) ? raw.equippedCharId : null,
     level: typeof raw.level === 'number' ? raw.level : 0,
     rarity: raw.rarity ?? WEAPONS[weaponId]?.rarity,
   }

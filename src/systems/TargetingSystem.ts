@@ -18,16 +18,27 @@ export class TargetingSystem {
     return best
   }
 
-  findFrontmostEnemy(enemies: Enemy[], range: number, fromY: number): Enemy | null {
+  findFrontmostEnemy(
+    enemies: Enemy[],
+    range: number,
+    fromX: number,
+    fromY: number,
+    excluded: Set<Enemy> = new Set(),
+  ): Enemy | null {
     let best: Enemy | null = null
-    let bestY = -Infinity
+    let bestScore = -Infinity
 
     for (const e of enemies) {
       if (!e.active || e.hp <= 0) continue
+      if (excluded.has(e)) continue
+      const dx = Math.abs(e.x - fromX)
       const dy = fromY - e.y
-      if (dy >= 0 && dy <= range && e.y > bestY) {
+      if (dy >= 0 && dy <= range) {
+        // 手前の敵を優先しつつ、立ち位置に近い敵へ少し傾く。
+        const score = e.y - dx * 0.16
+        if (score <= bestScore) continue
         best = e
-        bestY = e.y
+        bestScore = score
       }
     }
     return best

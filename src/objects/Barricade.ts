@@ -11,12 +11,15 @@ export class Barricade {
     this.hp = maxHp
     this.maxHp = maxHp
 
-    this.body = scene.add.rectangle(GAME_W / 2, BARRICADE_Y, GAME_W - 20, BARRICADE_H, 0x886644)
+    scene.add.rectangle(GAME_W / 2, BARRICADE_Y - 8, GAME_W - 28, 10, 0x3b445f, 0.95)
+      .setDepth(2)
+    this.body = scene.add.rectangle(GAME_W / 2, BARRICADE_Y, GAME_W - 18, BARRICADE_H + 8, 0x92704a)
+      .setStrokeStyle(2, 0x2b2117)
       .setDepth(3)
 
-    scene.add.rectangle(GAME_W / 2, BARRICADE_Y + 14, GAME_W - 40, 6, 0x333333)
+    scene.add.rectangle(GAME_W / 2, BARRICADE_Y + 18, GAME_W - 56, 8, 0x232733)
       .setDepth(4)
-    this.bar = scene.add.rectangle(GAME_W / 2, BARRICADE_Y + 14, GAME_W - 40, 6, 0x44cc66)
+    this.bar = scene.add.rectangle(GAME_W / 2, BARRICADE_Y + 18, GAME_W - 56, 8, 0x44cc66)
       .setDepth(4)
   }
 

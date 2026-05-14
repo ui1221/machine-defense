@@ -1,6 +1,6 @@
 import type { StageConfig } from '../types'
 
-export const STAGES: StageConfig[] = [
+const RAW_STAGES: StageConfig[] = [
   {
     id: 'stage_1',
     name: '第1区画',
@@ -635,3 +635,17 @@ export const STAGES: StageConfig[] = [
     ],
   },
 ]
+
+const STAGE_ENEMY_HP_MULTS = [
+  1.00, 1.04, 1.08, 1.12, 1.17,
+  1.22, 1.27, 1.32, 1.38, 1.44,
+  1.50, 1.57, 1.64, 1.71, 1.79,
+  1.87, 1.96, 2.05, 2.15, 2.25,
+  2.36, 2.48, 2.60, 2.73, 2.87,
+  3.02, 3.18, 3.35, 3.53, 3.72,
+]
+
+export const STAGES: StageConfig[] = RAW_STAGES.map((stage, index) => ({
+  ...stage,
+  enemyHpMult: STAGE_ENEMY_HP_MULTS[index] ?? 1,
+}))

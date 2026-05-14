@@ -22,39 +22,40 @@ export class BattleUIScene extends Phaser.Scene {
   }
 
   create() {
-    // 上段: レベル・経過時間・EXP。操作ボタンとは分離してEXP幅を確保する。
-    this.add.rectangle(GAME_W / 2, 22, GAME_W, 44, 0x000000, 0.62).setDepth(100)
+    // 上段HUD。中央の戦場面積を守るため、情報は最上部に押し込む。
+    this.add.rectangle(GAME_W / 2, 25, GAME_W, 50, 0x05070d, 0.78).setDepth(100)
+    this.add.rectangle(GAME_W / 2, 49, GAME_W - 18, 1, 0x41506d, 0.7).setDepth(101)
 
-    this.levelText = this.add.text(10, 6, 'Lv.0', {
+    this.levelText = this.add.text(12, 7, 'Lv.0', {
       fontSize: '16px', color: '#ffdd44', fontStyle: 'bold',
     }).setDepth(101)
 
-    this.timeText = this.add.text(GAME_W - 12, 6, '00:00', {
+    this.timeText = this.add.text(GAME_W - 12, 7, '00:00', {
       fontSize: '14px', color: '#d8e8ff', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(101)
 
-    this.add.rectangle(GAME_W / 2, 33, GAME_W - 24, 11, 0x222244).setDepth(101)
-    this.expBar = this.add.rectangle(12, 33, GAME_W - 24, 11, 0x44aaff)
+    this.add.rectangle(GAME_W / 2, 35, GAME_W - 24, 10, 0x20243a).setDepth(101)
+    this.expBar = this.add.rectangle(12, 35, GAME_W - 24, 10, 0x48b5ff)
       .setOrigin(0, 0.5)
       .setDepth(102)
     this.expBar.scaleX = 0
-    this.add.text(GAME_W / 2, 33, 'EXP', {
+    this.add.text(GAME_W / 2, 35, 'EXP', {
       fontSize: '9px', color: '#d8e8ff',
     }).setOrigin(0.5).setDepth(103)
 
-    // 二段目: 操作ボタン。半透明で、敵の出現を隠しすぎない位置に浮かせる。
-    this.pauseText = this.makeHudButton(GAME_W - 92, 64, 44, 'II', () => {
+    // 操作系は右上に寄せ、戦場中央から外す。
+    this.pauseText = this.makeHudButton(GAME_W - 90, 72, 46, 'II', () => {
       this.battle.toggleUserPause()
       this.onUpdate()
     })
 
-    this.speedText = this.makeHudButton(GAME_W - 34, 64, 54, 'x1', () => {
+    this.speedText = this.makeHudButton(GAME_W - 34, 72, 54, 'x1', () => {
       this.battle.cycleSpeed()
       this.onUpdate()
     })
 
-    // バリケード耐久は、実物のバリケード付近に表示する。
-    this.hpText = this.add.text(GAME_W - 18, BARRICADE_Y + 21, '', {
+    // バリケード耐久は設備本体の右端へ寄せる。
+    this.hpText = this.add.text(GAME_W - 26, BARRICADE_Y + 33, '', {
       fontSize: '12px', color: '#ffeecc', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setDepth(105)
@@ -68,8 +69,8 @@ export class BattleUIScene extends Phaser.Scene {
   }
 
   private makeHudButton(x: number, y: number, w: number, label: string, onClick: () => void) {
-    const bg = this.add.rectangle(x, y, w, 28, 0x10213a, 0.38)
-      .setStrokeStyle(1, 0x88bbdd, 0.42)
+    const bg = this.add.rectangle(x, y, w, 28, 0x10213a, 0.48)
+      .setStrokeStyle(1, 0x88bbdd, 0.58)
       .setInteractive({ useHandCursor: true })
       .setDepth(101)
     const text = this.add.text(x, y, label, {
@@ -117,8 +118,9 @@ export class BattleUIScene extends Phaser.Scene {
 
     choices.forEach((opt, i) => {
       const cy = -60 + i * 85
-      const card = this.add.rectangle(0, cy, GAME_W - 80, 72, 0x1a2a44)
-        .setStrokeStyle(2, 0x446688)
+      const isRare = opt.id.startsWith('rare_')
+      const card = this.add.rectangle(0, cy, GAME_W - 80, 72, isRare ? 0x302711 : 0x1a2a44)
+        .setStrokeStyle(isRare ? 3 : 2, isRare ? 0xffd34d : 0x446688)
         .setInteractive({ useHandCursor: true })
 
       const emoji = this.add.text(-160, cy, opt.emoji, { fontSize: '32px' }).setOrigin(0.5)
@@ -132,8 +134,8 @@ export class BattleUIScene extends Phaser.Scene {
       card.on('pointerdown', () => {
         this.battle.applyUpgrade(opt.id)
       })
-      card.on('pointerover', () => card.setFillStyle(0x2a3a66))
-      card.on('pointerout', () => card.setFillStyle(0x1a2a44))
+      card.on('pointerover', () => card.setFillStyle(isRare ? 0x46391a : 0x2a3a66))
+      card.on('pointerout', () => card.setFillStyle(isRare ? 0x302711 : 0x1a2a44))
 
       this.levelUpContainer!.add([card, emoji, name, desc])
     })

@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 
-const DURATION = 2500
-const TICK_INTERVAL = 500
-const SLOW_FACTOR = 0.45
+const DURATION = 3000
+const TICK_INTERVAL = 280
+const SLOW_FACTOR = 0.35
 
 export class DamageZone extends Phaser.GameObjects.Arc {
   readonly zoneRadius: number

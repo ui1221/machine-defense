@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import {
   GAME_W, GAME_H, BARRICADE_Y, CHAR_LINE_Y, MAX_CHARACTERS,
-  SPAWN_Y, SPAWN_MARGIN_X, FIELD_LEFT, FIELD_RIGHT, CHAR_SLOTS,
+  SPAWN_Y, SPAWN_MARGIN_X, FIELD_LEFT, FIELD_RIGHT, CHAR_SLOTS, DEFAULT_BARRICADE_HP,
 } from '../constants'
 import { STAGES } from '../data/stages'
 import { CHARACTERS } from '../data/characters'
@@ -12,6 +12,8 @@ import { Enemy } from '../objects/Enemy'
 import { Bullet } from '../objects/Bullet'
 import { Barricade } from '../objects/Barricade'
 import { DamageZone } from '../objects/DamageZone'
+import { BeamZone } from '../objects/BeamZone'
+import { OrbField } from '../objects/OrbField'
 import { SpawnManager } from '../systems/SpawnManager'
 import { InputManager } from '../systems/InputManager'
 import { TargetingSystem } from '../systems/TargetingSystem'
@@ -20,8 +22,12 @@ import { UPGRADE_POOL } from '../data/upgrades'
 import { loadSave } from '../systems/SaveData'
 import type { StageConfig, BattleState, GameSave, CharacterDamageStat } from '../types'
 
-const ZONE_RADIUS = 50
+const ZONE_RADIUS = 62
+const FIELD_ZONE_DAMAGE_MULT = 0.75
+const BEAM_ZONE_DAMAGE_MULT = 0.48
 const CRIT_MULT = 2.5
+const RAILGUN_KNOCKBACK_DIST = 80
+const ORB_KNOCKBACK_DIST = 8
 
 export class BattleScene extends Phaser.Scene {
   characters: Character[] = []
@@ -39,6 +45,8 @@ export class BattleScene extends Phaser.Scene {
   private killCount = 0
   private droppedWeapons: string[] = []
   private damageZones: DamageZone[] = []
+  private beamZones: BeamZone[] = []
+  private orbFields: OrbField[] = []
   private damageByCharacter = new Map<string, number>()
   elapsedMs = 0
   private pausedByUser = false
@@ -54,6 +62,8 @@ export class BattleScene extends Phaser.Scene {
     this.killCount = 0
     this.droppedWeapons = []
     this.damageZones = []
+    this.beamZones = []
+    this.orbFields = []
     this.damageByCharacter = new Map()
     this.elapsedMs = 0
     this.pausedByUser = false
@@ -61,16 +71,23 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x111122)
-    const groundH = GAME_H - BARRICADE_Y + 40
-    this.add.rectangle(GAME_W / 2, GAME_H - groundH / 2, GAME_W, groundH, 0x1a1a2e)
+    // 背景は後から画像に差し替えやすいよう、戦場・防衛帯・足元で分けておく。
+    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x10121c).setDepth(0)
+    this.add.rectangle(GAME_W / 2, (BARRICADE_Y - 34) / 2, GAME_W, BARRICADE_Y - 34, 0x141726).setDepth(0)
+    this.add.rectangle(GAME_W / 2, BARRICADE_Y - 42, GAME_W - 28, 4, 0x293149, 0.9).setDepth(1)
+    this.add.rectangle(GAME_W / 2, BARRICADE_Y + 74, GAME_W, 150, 0x181b29, 0.95).setDepth(0)
+    this.add.rectangle(GAME_W / 2, BARRICADE_Y + 24, GAME_W - 24, 118, 0x202538, 0.34)
+      .setStrokeStyle(1, 0x39425f, 0.6)
+      .setDepth(1)
+    this.add.rectangle(GAME_W / 2, GAME_H - 34, GAME_W - 36, 58, 0x0d1018, 0.9)
+      .setStrokeStyle(1, 0x263047, 0.8)
+      .setDepth(1)
 
     this.enemies = this.add.group({ runChildUpdate: false })
     this.bullets = this.add.group({ runChildUpdate: false })
 
     const save = this.loadSave()
-    const barricadeHp = this.stage.barricadeHp + save.upgrades.barricadeHpLevel * 12
-    this.barricade = new Barricade(this, barricadeHp)
+    this.barricade = new Barricade(this, DEFAULT_BARRICADE_HP + save.upgrades.barricadeHpLevel * 5)
     this.spawnManager = new SpawnManager(this.stage)
     this.inputManager = new InputManager(this)
     this.targeting = new TargetingSystem()
@@ -82,6 +99,8 @@ export class BattleScene extends Phaser.Scene {
 
   addCharacter(charId: string) {
     if (this.characters.length >= MAX_CHARACTERS) return
+    if (charId === 'rapid') charId = 'assault'
+    if (this.characters.some(ch => ch.config.id === charId)) return
     const cfg = CHARACTERS[charId]
     if (!cfg) return
     const slotX = CHAR_SLOTS[this.characters.length]
@@ -111,12 +130,15 @@ export class BattleScene extends Phaser.Scene {
     // 敵スポーン
     const spawns = this.spawnManager.update(scaledDelta)
     for (const entry of spawns) {
-      const cfg = ENEMIES[entry.enemyId]
-      if (!cfg) continue
-      const cx = FIELD_LEFT + Math.random() * (FIELD_RIGHT - FIELD_LEFT)
+      const baseCfg = ENEMIES[entry.enemyId]
+      if (!baseCfg) continue
+      const hpMult = (this.stage.enemyHpMult ?? 1) * (entry.hpMult ?? 1)
+      const cfg = hpMult !== 1
+        ? { ...baseCfg, hp: Math.max(1, Math.round(baseCfg.hp * hpMult)) }
+        : baseCfg
+      const cx = this.pickSpawnCenter(entry.spread)
       for (let i = 0; i < entry.count; i++) {
-        const x = cx + (Math.random() - 0.5) * entry.spread
-        const clampedX = Math.max(SPAWN_MARGIN_X, Math.min(GAME_W - SPAWN_MARGIN_X, x))
+        const clampedX = this.pickSpawnX(cx, entry.spread, entry.count)
         const e = new Enemy(this, clampedX, SPAWN_Y + Math.random() * 40, cfg)
         this.add.existing(e)
         this.enemies.add(e)
@@ -143,6 +165,34 @@ export class BattleScene extends Phaser.Scene {
         }
       }
     }
+    this.beamZones = this.beamZones.filter(z => z.active)
+    for (const beam of this.beamZones) {
+      beam.update(now, scaledDelta)
+      if (!beam.shouldTick) continue
+      for (const e of enemyList) {
+        if (!e.active || !beam.containsEnemy(e)) continue
+        const rolled = this.rollCharacterDamage(beam.ownerId, beam.damagePerTick)
+        const dead = e.takeDamage(rolled.damage)
+        this.recordCharacterDamage(beam.ownerId, e.lastDamageTaken)
+        this.showDamageNumber(e.x, e.y, e.lastDamageTaken, 0x88eeff, rolled.crit)
+        if (dead) this.onEnemyKilled(e)
+      }
+    }
+    this.orbFields = this.orbFields.filter(z => z.active)
+    for (const orb of this.orbFields) {
+      orb.update(now, scaledDelta)
+      for (const e of enemyList) {
+        if (!e.active || !orb.containsEnemy(e)) continue
+        e.speedMult = Math.min(e.speedMult, orb.slowFactor)
+        if (!orb.shouldTick) continue
+        const rolled = this.rollCharacterDamage(orb.ownerId, orb.damagePerTick)
+        const dead = e.takeDamage(rolled.damage)
+        this.recordCharacterDamage(orb.ownerId, e.lastDamageTaken)
+        this.showDamageNumber(e.x, e.y, e.lastDamageTaken, 0x9fc7ff, rolled.crit)
+        if (dead) this.onEnemyKilled(e)
+        else e.knockback(ORB_KNOCKBACK_DIST)
+      }
+    }
 
     for (const e of enemyList) {
       if (!e.active) continue
@@ -157,59 +207,92 @@ export class BattleScene extends Phaser.Scene {
       if (!result) continue
 
       if (result.kind === 'slash') {
-        const baseAng = Math.atan2(result.ty - ch.y, result.tx - ch.x)
+        const usedTargets = new Set<Enemy>()
         for (let action = 0; action < ch.actionCount; action++) {
-          const actionOffset = (action - (ch.actionCount - 1) / 2) * 0.08
-          const dist = Phaser.Math.Distance.Between(ch.x, ch.y, result.tx, result.ty)
-          this.doSlash(
-            ch,
-            ch.x + Math.cos(baseAng + actionOffset) * dist,
-            ch.y + Math.sin(baseAng + actionOffset) * dist,
-            enemyList,
-          )
+          this.time.delayedCall(action * 90, () => {
+            if (!ch.active || this.gameEnded) return
+            const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
+            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
+            const dist = Phaser.Math.Distance.Between(ch.x, ch.y, aim.tx, aim.ty)
+            this.doSlash(
+              ch,
+              ch.x + Math.cos(baseAng) * dist,
+              ch.y + Math.sin(baseAng) * dist,
+              this.enemies.getChildren() as Enemy[],
+            )
+          })
         }
 
-      } else if (result.kind === 'burst') {
-        const baseAng = Math.atan2(result.ty - ch.y, result.tx - ch.x)
-        const count = ch.burstCount
-        const spread = 0.1
-        const step = count > 1 ? (spread * 2) / (count - 1) : 0
-        const startOffset = count > 1 ? -spread : 0
+      } else if (result.kind === 'beam') {
         for (let action = 0; action < ch.actionCount; action++) {
-          const actionOffset = (action - (ch.actionCount - 1) / 2) * 0.06
-          for (let bi = 0; bi < count; bi++) {
-            const ang = baseAng + actionOffset + startOffset + step * bi
-            const hitsLeft = ch.piercing ? 2 : 1
-            const b = new Bullet(
-              this, ch.x, ch.y - 10,
-              ch.x + Math.cos(ang) * 1000, ch.y + Math.sin(ang) * 1000,
-              ch.config.bulletSpeed, ch.effectiveAtk,
-              ch.config.id,
-              hitsLeft, 'normal',
-            )
-            this.add.existing(b)
-            this.bullets.add(b)
-          }
+          this.showBeamCharge(ch, result.tx, result.ty, action * 140)
+          this.time.delayedCall(action * 140 + 320, () => {
+            if (!ch.active || this.gameEnded) return
+            this.createBeamZone(ch, result.tx, result.ty)
+          })
+        }
+      } else if (result.kind === 'orb') {
+        const usedTargets = new Set<Enemy>()
+        for (let action = 0; action < ch.actionCount; action++) {
+          this.time.delayedCall(action * 130, () => {
+            if (!ch.active || this.gameEnded) return
+            const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
+            this.createOrbField(ch, aim.tx, aim.ty)
+          })
+        }
+      } else if (result.kind === 'stun_shot') {
+        const usedTargets = new Set<Enemy>()
+        for (let action = 0; action < ch.actionCount; action++) {
+          this.time.delayedCall(action * 120, () => {
+            if (!ch.active || this.gameEnded) return
+            const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
+            this.resolveStunShot(ch, aim.tx, aim.ty)
+          })
+        }
+      } else if (result.kind === 'burst') {
+        const usedTargets = new Set<Enemy>()
+        for (let action = 0; action < ch.actionCount; action++) {
+          this.time.delayedCall(action * 90, () => {
+            if (!ch.active || this.gameEnded) return
+            const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
+            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
+            const angles = this.buildBurstAngles(baseAng, ch.burstCount)
+            for (const ang of angles) {
+              const hitsLeft = ch.piercing ? 2 : 1
+              const b = new Bullet(
+                this, ch.x, ch.y - 10,
+                ch.x + Math.cos(ang) * 1000, ch.y + Math.sin(ang) * 1000,
+                ch.config.bulletSpeed, ch.effectiveAtk,
+                ch.config.id,
+                hitsLeft, 'normal',
+              )
+              this.add.existing(b)
+              this.bullets.add(b)
+            }
+          })
         }
 
       } else {
         const isRailgun = ch.config.id === 'railgun'
         const style = result.kind === 'field_bolt' ? 'field'
           : isRailgun ? 'railgun' : 'normal'
-        const hitsLeft = isRailgun ? 2 : (ch.piercing ? 2 : 1)
-        const baseAng = Math.atan2(result.ty - ch.y, result.tx - ch.x)
+        const hitsLeft = isRailgun ? 4 : (ch.piercing ? 2 : 1)
+        const usedTargets = new Set<Enemy>()
         for (let action = 0; action < ch.actionCount; action++) {
-          const actionOffset = (action - (ch.actionCount - 1) / 2) * 0.05
-          const ang = baseAng + actionOffset
-          const b = new Bullet(
-            this, ch.x, ch.y - 10,
-            ch.x + Math.cos(ang) * 1000, ch.y + Math.sin(ang) * 1000,
-            ch.config.bulletSpeed, ch.effectiveAtk,
-            ch.config.id,
-            hitsLeft, style,
-          )
-          this.add.existing(b)
-          this.bullets.add(b)
+          this.time.delayedCall(action * 110, () => {
+            if (!ch.active || this.gameEnded) return
+            const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
+            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
+            const b = new Bullet(
+              this, ch.x, ch.y - 10,
+              ch.x + Math.cos(baseAng) * 1000, ch.y + Math.sin(baseAng) * 1000,
+              ch.config.bulletSpeed, ch.effectiveAtk,
+              ch.config.id,
+              hitsLeft, style,
+            )
+            this.add.existing(b)
+            this.bullets.add(b)
+          })
         }
       }
     }
@@ -232,6 +315,7 @@ export class BattleScene extends Phaser.Scene {
           this.recordCharacterDamage(b.ownerId, hit.lastDamageTaken)
           this.showDamageNumber(hit.x, hit.y, hit.lastDamageTaken, rolled.crit ? 0xffee66 : 0xffffff, rolled.crit)
           if (dead) this.onEnemyKilled(hit)
+          else if (b.ownerId === 'railgun') hit.knockback(RAILGUN_KNOCKBACK_DIST)
           b.hitsLeft--
           if (b.hitsLeft <= 0) b.destroy()
         }
@@ -242,7 +326,8 @@ export class BattleScene extends Phaser.Scene {
     for (const e of enemyList) {
       if (!e.active) continue
       if (e.tryAttackBarricade(now)) {
-        const destroyed = this.barricade.takeDamage(e.damage, this)
+        const damage = Math.max(1, Math.ceil(e.damage * 0.2))
+        const destroyed = this.barricade.takeDamage(damage, this)
         if (destroyed) { this.endGame(false); return }
       }
     }
@@ -256,8 +341,62 @@ export class BattleScene extends Phaser.Scene {
   }
 
   // ─── ナイト スラッシュ ──────────────────────────────
+  private buildBurstAngles(baseAng: number, count: number) {
+    const gap = 0.036
+    const offsets = [0]
+    for (let i = 1; offsets.length < count; i++) {
+      offsets.push(-gap * i)
+      if (offsets.length < count) offsets.push(gap * i)
+    }
+    return offsets.map(offset => baseAng + offset)
+  }
+
+  private pickActionAim(ch: Character, fallbackTx: number, fallbackTy: number, usedTargets: Set<Enemy>) {
+    if (this.inputManager.isPointerDown) return { tx: fallbackTx, ty: fallbackTy }
+
+    const enemies = this.enemies.getChildren() as Enemy[]
+    const target = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.x, ch.y, usedTargets)
+    if (target) {
+      usedTargets.add(target)
+      return { tx: target.x, ty: target.y }
+    }
+
+    usedTargets.clear()
+    const retry = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.x, ch.y, usedTargets)
+    if (retry) {
+      usedTargets.add(retry)
+      return { tx: retry.x, ty: retry.y }
+    }
+
+    return { tx: fallbackTx, ty: fallbackTy }
+  }
+
+  private pickSpawnCenter(spread: number) {
+    const left = Math.max(SPAWN_MARGIN_X, FIELD_LEFT)
+    const right = Math.min(GAME_W - SPAWN_MARGIN_X, FIELD_RIGHT)
+    const safeSpread = Math.min(spread, right - left)
+    const min = left + safeSpread / 2
+    const max = right - safeSpread / 2
+    if (max <= min) return GAME_W / 2
+    return min + Math.random() * (max - min)
+  }
+
+  private pickSpawnX(center: number, spread: number, count: number) {
+    const left = Math.max(SPAWN_MARGIN_X, FIELD_LEFT)
+    const right = Math.min(GAME_W - SPAWN_MARGIN_X, FIELD_RIGHT)
+    if (count <= 1) {
+      const centerBiased = (Math.random() + Math.random()) / 2
+      return left + centerBiased * (right - left)
+    }
+    const safeSpread = Math.min(spread, right - left)
+    return center + (Math.random() - 0.5) * safeSpread
+  }
+
   private readonly SLASH_RADIUS = 100
-  private readonly KNOCKBACK_DIST = 80
+  private readonly KNOCKBACK_DIST = 52
+  private readonly SLASH_DAMAGE_MULT = 0.82
+  private readonly SLASH_SLOW_DURATION = 900
+  private readonly SLASH_SLOW_FACTOR = 0.72
 
   private doSlash(ch: Character, tx: number, ty: number, enemies: Enemy[]) {
     const r = this.SLASH_RADIUS * ch.areaMult
@@ -285,13 +424,14 @@ export class BattleScene extends Phaser.Scene {
       const dx = e.x - tx
       const dy = e.y - ty
       if (dx * dx + dy * dy < r * r) {
-        const rolled = this.rollCharacterDamage(ch.config.id, ch.effectiveAtk)
+        const rolled = this.rollCharacterDamage(ch.config.id, ch.effectiveAtk * this.SLASH_DAMAGE_MULT)
         const dead = e.takeDamage(rolled.damage)
         this.recordCharacterDamage(ch.config.id, e.lastDamageTaken)
         this.showDamageNumber(e.x, e.y, e.lastDamageTaken, rolled.crit ? 0xffee66 : 0xffcc00, rolled.crit)
         if (dead) {
           this.onEnemyKilled(e)
         } else {
+          e.slow(this.elapsedMs + this.SLASH_SLOW_DURATION, this.SLASH_SLOW_FACTOR)
           e.knockback(this.KNOCKBACK_DIST)
         }
       }
@@ -302,9 +442,123 @@ export class BattleScene extends Phaser.Scene {
   private createDamageZone(x: number, y: number, bulletAtk: number, ownerId: string) {
     const owner = this.characters.find(ch => ch.config.id === ownerId)
     const radius = ZONE_RADIUS * (owner?.areaMult ?? 1)
-    const zone = new DamageZone(this, x, y, radius, Math.max(1, Math.round(bulletAtk * 0.35)), ownerId)
+    const zone = new DamageZone(this, x, y, radius, Math.max(1, Math.round(bulletAtk * FIELD_ZONE_DAMAGE_MULT)), ownerId)
     this.add.existing(zone)
     this.damageZones.push(zone)
+  }
+
+  private createBeamZone(ch: Character, tx: number, ty: number) {
+    const ang = Math.atan2(ty - ch.y, tx - ch.x)
+    const length = 1180 * ch.areaMult
+    const width = 36 * ch.areaMult
+    const cx = ch.x + Math.cos(ang) * (length / 2)
+    const cy = ch.y + Math.sin(ang) * (length / 2)
+    const beam = new BeamZone(this, cx, cy, length, width, ang, Math.max(1, Math.round(ch.effectiveAtk * BEAM_ZONE_DAMAGE_MULT)), ch.config.id)
+    this.add.existing(beam)
+    this.beamZones.push(beam)
+  }
+
+  private showBeamCharge(ch: Character, tx: number, ty: number, delay: number) {
+    this.time.delayedCall(delay, () => {
+      if (!ch.active || this.gameEnded) return
+      const angle = Math.atan2(ty - ch.y, tx - ch.x)
+      const spark = this.add.circle(ch.x, ch.y - 12, 8, 0xaaf2ff, 0.92).setDepth(18)
+      const guide = this.add.rectangle(
+        ch.x + Math.cos(angle) * 92,
+        ch.y + Math.sin(angle) * 92,
+        184,
+        4,
+        0x66ddff,
+        0.18,
+      ).setRotation(angle).setDepth(17)
+      this.tweens.add({
+        targets: spark,
+        scaleX: 1.9,
+        scaleY: 1.9,
+        alpha: 0.2,
+        duration: 320,
+        onComplete: () => spark.destroy(),
+      })
+      this.tweens.add({
+        targets: guide,
+        alpha: 0.55,
+        duration: 220,
+        yoyo: true,
+        onComplete: () => guide.destroy(),
+      })
+    })
+  }
+
+  private createOrbField(ch: Character, tx: number, ty: number) {
+    const orb = new OrbField(this, ch.x, ch.y - 10, tx, ty, ch.config.bulletSpeed, Math.max(1, Math.round(ch.effectiveAtk * 0.7)), ch.config.id)
+    this.add.existing(orb)
+    this.orbFields.push(orb)
+  }
+
+  private resolveStunShot(ch: Character, tx: number, ty: number) {
+    const enemies = this.enemies.getChildren() as Enemy[]
+    let best: Enemy | null = null
+    let bestDist = Infinity
+    for (const enemy of enemies) {
+      if (!enemy.active) continue
+      const dx = enemy.x - tx
+      const dy = enemy.y - ty
+      const dist = dx * dx + dy * dy
+      if (dist < bestDist) {
+        best = enemy
+        bestDist = dist
+      }
+    }
+    if (!best) return
+    this.hitWithStun(ch, best)
+    if (!ch.stunBlast) return
+    const radius = 70 * ch.areaMult
+    const flash = this.add.circle(best.x, best.y, radius, 0x88ddff, 0.18).setDepth(19)
+    this.tweens.add({ targets: flash, alpha: 0, scaleX: 1.2, scaleY: 1.2, duration: 260, onComplete: () => flash.destroy() })
+    for (const enemy of enemies) {
+      if (!enemy.active || enemy === best) continue
+      const dx = enemy.x - best.x
+      const dy = enemy.y - best.y
+      if (dx * dx + dy * dy > radius * radius) continue
+      this.hitWithStun(ch, enemy, 0.6)
+    }
+  }
+
+  private hitWithStun(ch: Character, enemy: Enemy, damageMult = 1) {
+    const rolled = this.rollCharacterDamage(ch.config.id, ch.effectiveAtk * damageMult)
+    const dead = enemy.takeDamage(rolled.damage)
+    enemy.stun(this.elapsedMs + 3400)
+    this.showStunImpact(enemy.x, enemy.y)
+    this.recordCharacterDamage(ch.config.id, enemy.lastDamageTaken)
+    this.showDamageNumber(enemy.x, enemy.y, enemy.lastDamageTaken, 0xaaddff, rolled.crit)
+    if (dead) this.onEnemyKilled(enemy)
+  }
+
+  private showStunImpact(x: number, y: number) {
+    const ring = this.add.circle(x, y, 12, 0x9fe8ff, 0.12)
+      .setStrokeStyle(3, 0xaaddff, 0.95)
+      .setDepth(24)
+    const flashH = this.add.rectangle(x, y, 30, 4, 0xdff8ff, 0.95).setDepth(25)
+    const flashV = this.add.rectangle(x, y, 4, 30, 0xdff8ff, 0.95).setDepth(25)
+    this.tweens.add({
+      targets: ring,
+      scaleX: 2.1,
+      scaleY: 2.1,
+      alpha: 0,
+      duration: 360,
+      onComplete: () => ring.destroy(),
+    })
+    this.tweens.add({
+      targets: [flashH, flashV],
+      alpha: 0,
+      scaleX: 1.25,
+      scaleY: 1.25,
+      duration: 220,
+      onComplete: () => {
+        flashH.destroy()
+        flashV.destroy()
+      },
+    })
   }
 
   // ─── 敵撃破 ────────────────────────────────────────
@@ -390,9 +644,9 @@ export class BattleScene extends Phaser.Scene {
   private showDamageNumber(x: number, y: number, damage: number, color = 0xffffff, crit = false) {
     const hex = '#' + color.toString(16).padStart(6, '0')
     const offsetX = (Math.random() - 0.5) * 20
-    const txt = this.add.text(x + offsetX, y - 10, crit ? `${Math.round(damage)}!` : `${Math.round(damage)}`, {
-      fontSize: crit ? '18px' : '14px', color: hex, fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
+    const txt = this.add.text(x + offsetX, y - 10, `${Math.round(damage)}`, {
+      fontSize: crit ? '22px' : '18px', color: hex, fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(25)
     this.tweens.add({
       targets: txt, y: y - 50, alpha: 0,
@@ -470,7 +724,7 @@ export class BattleScene extends Phaser.Scene {
     const weapon = WEAPONS[equipped.weaponId]
     if (!weapon) return
     const levelBonus = 1 + equipped.level * 0.1
-    const bonus = (1 + save.upgrades.equipmentLevel * 0.05) * levelBonus
+    const bonus = levelBonus * (1 + save.upgrades.equipmentLevel * 0.03)
     if (weapon.atkMult !== 1)      ch.atkMult      *= 1 + (weapon.atkMult - 1) * bonus
     if (weapon.atkSpeedMult < 1)   ch.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
     if (weapon.atkSpeedMult > 1)   ch.atkSpeedMult *= weapon.atkSpeedMult
@@ -480,13 +734,26 @@ export class BattleScene extends Phaser.Scene {
 
   private applyPermanentUpgrade(ch: Character) {
     const save = this.loadSave()
-    if (ch.config.id !== 'assault') return
-    if (save.upgrades.assaultAtkLevel > 0) {
-      ch.atkMult *= 1 + save.upgrades.assaultAtkLevel * 0.08
+    const atkLevelKey = `${ch.config.id}AtkLevel` as keyof GameSave['upgrades']
+    const atkLevel = Math.min(Number(save.upgrades[atkLevelKey] ?? 0), this.characterLevelCap(save))
+    const atkGrowthRate = ch.config.upgradeAtkGrowthRate ?? 0.06
+    const critGrowth = ch.config.upgradeCritGrowth ?? 0.001
+    if (atkLevel > 0) ch.atkMult *= 1 + atkLevel * atkGrowthRate
+    if (atkLevel > 0) ch.critChance = Math.min(0.65, ch.critChance + atkLevel * critGrowth)
+    const cooldownBonusSteps = Math.floor(atkLevel / 10)
+    if (cooldownBonusSteps > 0) {
+      const cooldownReduction = Math.min(0.08, cooldownBonusSteps * 0.005)
+      ch.atkSpeedMult *= 1 - cooldownReduction
     }
-    if (save.upgrades.assaultCooldownLevel > 0) {
-      ch.atkSpeedMult *= Math.max(0.5, 1 - save.upgrades.assaultCooldownLevel * 0.05)
-    }
+  }
+
+  private characterLevelCap(save: GameSave) {
+    if (save.debugUnlockAllStages) return 30
+    const highestCleared = save.clearedStages.reduce((max, id) => {
+      const n = Number(id.replace('stage_', ''))
+      return Number.isFinite(n) ? Math.max(max, n) : max
+    }, 0)
+    return Math.min(30, highestCleared + 1)
   }
 
   private loadSave(): GameSave {
@@ -530,6 +797,7 @@ export class BattleScene extends Phaser.Scene {
       boostCharCrit:     (id, a) => { const c = this.characters.find(ch => ch.config.id === id); if (c) c.critChance   += a },
       addCharAction:     (id)    => { const c = this.characters.find(ch => ch.config.id === id); if (c) c.actionCount  += 1 },
       addCharBurst:      (id)    => { const c = this.characters.find(ch => ch.config.id === id); if (c) c.burstCount   += 1 },
+      enableStunBlast:   (id)    => { const c = this.characters.find(ch => ch.config.id === id); if (c) c.stunBlast    = true },
       enableCharPiercing:(id)    => { const c = this.characters.find(ch => ch.config.id === id); if (c) c.piercing      = true },
     }
   }

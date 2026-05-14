@@ -8,6 +8,7 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 192,
       frameHeight: 208,
     })
+    this.load.image('home_portrait', '/machine-defense/assets/home-portrait.png')
   }
 
   create() {

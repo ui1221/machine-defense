@@ -2,8 +2,9 @@ import Phaser from 'phaser'
 import type { EnemyConfig } from '../types'
 import { BARRICADE_Y } from '../constants'
 
-const ATTACK_DELAY = 800   // バリケード到達から最初の攻撃まで(ms)
-const ATTACK_COOLDOWN = 1200  // 攻撃間のクールタイム(ms)
+const ATTACK_DELAY = 1600
+const ATTACK_COOLDOWN = 3600
+const ATTACK_INTERRUPT_DELAY = ATTACK_DELAY
 const HEAL_INTERVAL = 2400
 const HEAL_RADIUS = 92
 const HEAL_AMOUNT = 5
@@ -20,8 +21,10 @@ export class Enemy extends Phaser.GameObjects.Container {
   atBarricade = false
   speedMult = 1   // 1.0 = normal, < 1 = slowed
   lastDamageTaken = 0
-  private lastAttackTime = 0
-  private arrivedTime = 0
+  stunnedUntil = 0
+  slowedUntil = 0
+  private persistentSlowFactor = 1
+  private nextAttackReadyTime = 0
   private attackWarningShown = false
   private charged = false
   private lastHealTime = 0
@@ -73,20 +76,24 @@ export class Enemy extends Phaser.GameObjects.Container {
       if (this.active) this.label.setAlpha(1)
     })
 
+    this.interruptBarricadeAttack()
+
     return this.hp <= 0
   }
 
   update(t: number, delta: number) {
     if (this.atBarricade) return
+    if (t < this.stunnedUntil) return
 
     this.updateSpecialMovement()
+    if (t < this.slowedUntil) this.speedMult *= this.persistentSlowFactor
     this.y += (this.speed * this.speedMult * delta) / 1000
 
     if (this.y >= BARRICADE_Y - 20) {
       this.y = BARRICADE_Y - 20
       this.atBarricade = true
-      this.arrivedTime = t
-      this.lastAttackTime = 0
+      this.nextAttackReadyTime = t + ATTACK_DELAY
+      this.attackWarningShown = false
     }
   }
 
@@ -94,20 +101,21 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.y = Math.max(BARRICADE_Y - 600, this.y - dist)
     if (this.atBarricade) {
       this.atBarricade = false
-      this.lastAttackTime = 0
+      this.nextAttackReadyTime = 0
+      this.attackWarningShown = false
     }
   }
 
   tryAttackBarricade(now: number): boolean {
     if (!this.atBarricade) return false
-    if (this.hasAbility('warning_attack') && !this.attackWarningShown && now - this.arrivedTime >= ATTACK_DELAY - 350) {
+    if (this.hasAbility('warning_attack') && !this.attackWarningShown && now >= this.nextAttackReadyTime - 350) {
       this.attackWarningShown = true
       this.showAttackWarning()
     }
-    if (now - this.arrivedTime < ATTACK_DELAY && this.lastAttackTime === 0) return false
-    if (this.lastAttackTime > 0 && now - this.lastAttackTime < ATTACK_COOLDOWN) return false
+    if (now < this.nextAttackReadyTime) return false
 
-    this.lastAttackTime = now
+    this.nextAttackReadyTime = now + ATTACK_COOLDOWN
+    this.attackWarningShown = false
 
     // 攻撃アニメーション
     this.scene.tweens.add({
@@ -118,6 +126,13 @@ export class Enemy extends Phaser.GameObjects.Container {
     })
 
     return true
+  }
+
+  private interruptBarricadeAttack() {
+    if (!this.atBarricade) return
+    const now = (this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now
+    this.nextAttackReadyTime = Math.max(this.nextAttackReadyTime, now + ATTACK_INTERRUPT_DELAY)
+    this.attackWarningShown = false
   }
 
   tryHealNearby(now: number, allies: Enemy[]): boolean {
@@ -156,6 +171,26 @@ export class Enemy extends Phaser.GameObjects.Container {
       alpha: 0,
       duration: 520,
       onComplete: () => txt.destroy(),
+    })
+  }
+
+  stun(until: number) {
+    this.stunnedUntil = Math.max(this.stunnedUntil, until)
+    this.bodyCircle.setFillStyle(0x99ddff, 0.55)
+    this.scene.time.delayedCall(Math.max(0, until - ((this.scene as { elapsedMs?: number }).elapsedMs ?? 0)), () => {
+      if (this.active) this.bodyCircle.setFillStyle(this.config.color ?? 0x667788, this.hasAbility('boss') ? 0.52 : 0.35)
+    })
+  }
+
+  slow(until: number, factor: number) {
+    this.slowedUntil = Math.max(this.slowedUntil, until)
+    this.persistentSlowFactor = Math.min(this.persistentSlowFactor, factor)
+    this.bodyCircle.setStrokeStyle(2, 0x66ddff, 0.8)
+    this.scene.time.delayedCall(Math.max(0, until - ((this.scene as { elapsedMs?: number }).elapsedMs ?? 0)), () => {
+      if (!this.active) return
+      if (((this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now) < this.slowedUntil) return
+      this.persistentSlowFactor = 1
+      this.bodyCircle.setStrokeStyle()
     })
   }
 

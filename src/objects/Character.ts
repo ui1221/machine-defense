@@ -12,6 +12,7 @@ export class Character extends Phaser.GameObjects.Container {
   areaMult = 1
   critChance = 0
   actionCount = 1
+  stunBlast = false
   piercing = false
   burstCount = 1
 
@@ -22,6 +23,8 @@ export class Character extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number, cfg: CharacterConfig) {
     super(scene, x, y)
     this.config = cfg
+    this.critChance = cfg.baseCritChance ?? 0
+    this.burstCount = cfg.baseBurstCount ?? 1
 
     const base = scene.add.rectangle(0, 16, 40, 8, 0x334455, 0.6)
     this.label = scene.add.text(0, 0, cfg.emoji, { fontSize: '36px' }).setOrigin(0.5)
@@ -60,7 +63,7 @@ export class Character extends Phaser.GameObjects.Container {
       tx = input.pointerX
       ty = input.pointerY
     } else {
-      const target = targeting.findFrontmostEnemy(enemies, this.effectiveRange, this.y)
+      const target = targeting.findFrontmostEnemy(enemies, this.effectiveRange, this.x, this.y)
       if (!target) return null
       tx = target.x
       ty = target.y
@@ -72,6 +75,9 @@ export class Character extends Phaser.GameObjects.Container {
     if (type === 'burst')    return { kind: 'burst', tx, ty }
     if (type === 'slash')    return { kind: 'slash', tx, ty }
     if (type === 'field')    return { kind: 'field_bolt', tx, ty }
+    if (type === 'beam')     return { kind: 'beam', tx, ty }
+    if (type === 'orb')      return { kind: 'orb', tx, ty }
+    if (type === 'stun')     return { kind: 'stun_shot', tx, ty }
     return { kind: 'bullet', tx, ty }
   }
 

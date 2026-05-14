@@ -1,4 +1,4 @@
-export type AttackType = 'bullet' | 'burst' | 'field' | 'slash'
+export type AttackType = 'bullet' | 'burst' | 'field' | 'slash' | 'beam' | 'orb' | 'stun'
 export type EnemyAbility = 'armor' | 'charge' | 'split' | 'warning_attack' | 'elite' | 'boss' | 'heal_aura'
 
 export type AttackResult =
@@ -6,6 +6,9 @@ export type AttackResult =
   | { kind: 'burst';  tx: number; ty: number }
   | { kind: 'field_bolt'; tx: number; ty: number }
   | { kind: 'slash'; tx: number; ty: number }
+  | { kind: 'beam'; tx: number; ty: number }
+  | { kind: 'orb'; tx: number; ty: number }
+  | { kind: 'stun_shot'; tx: number; ty: number }
 
 export interface CharacterConfig {
   id: string
@@ -17,6 +20,11 @@ export interface CharacterConfig {
   atkSpeed: number    // ms between shots (lower = faster)
   range: number       // px
   bulletSpeed: number  // px/s
+  baseCritChance?: number
+  baseBurstCount?: number
+  upgradeAtkGrowth?: number
+  upgradeAtkGrowthRate?: number
+  upgradeCritGrowth?: number
 }
 
 export interface EnemyConfig {
@@ -38,6 +46,18 @@ export interface SpawnEntry {
   enemyId: string
   count: number
   spread: number      // x spread in px
+  duration?: number   // seconds to trickle-spawn this entry; 0 = instant
+  hpMult?: number
+}
+
+export interface AmbientSpawnConfig {
+  start: number
+  end: number
+  interval: number
+  enemyId: string
+  count: number
+  spread: number
+  hpMult?: number
 }
 
 export interface StageConfig {
@@ -46,8 +66,10 @@ export interface StageConfig {
   description: string
   difficulty: number  // 1-5
   barricadeHp: number
+  enemyHpMult?: number
   startingCharacter: string
   spawnTable: SpawnEntry[]
+  ambientSpawns?: AmbientSpawnConfig[]
 }
 
 export type UpgradeCategory = 'add_character' | 'stat_boost' | 'special'
@@ -76,6 +98,7 @@ export interface BattleState {
   boostCharCrit: (charId: string, add: number) => void
   addCharAction: (charId: string) => void
   addCharBurst: (charId: string) => void
+  enableStunBlast: (charId: string) => void
   enableCharPiercing: (charId: string) => void
 }
 
@@ -109,8 +132,23 @@ export interface CharacterDamageStat {
 export interface PermanentUpgrades {
   assaultAtkLevel: number
   assaultCooldownLevel: number
+  railgunAtkLevel: number
+  railgunCooldownLevel: number
+  rapidAtkLevel: number
+  rapidCooldownLevel: number
+  bladeAtkLevel: number
+  bladeCooldownLevel: number
+  fieldAtkLevel: number
+  fieldCooldownLevel: number
+  beamAtkLevel: number
+  beamCooldownLevel: number
+  orbAtkLevel: number
+  orbCooldownLevel: number
+  stunAtkLevel: number
+  stunCooldownLevel: number
   barricadeHpLevel: number
   equipmentLevel: number
+  researchLevel: number
 }
 
 export interface GameSave {

@@ -115,7 +115,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
   boss_siege: {
     id: 'boss_siege', name: '大型制圧型', emoji: '⬣',
     description: '区画を制圧するための大型機。遅いが、非常に高い耐久と強い攻撃を持つ。',
-    hp: 320, speed: 4, damage: 30, expReward: 80, size: 42, color: 0xff8844,
+    hp: 500, speed: 4, damage: 30, expReward: 80, size: 42, color: 0xff8844,
     abilities: ['warning_attack', 'boss'],
   },
 }
