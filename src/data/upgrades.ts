@@ -11,7 +11,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '🎯',
     weight: 6,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('railgun'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('railgun'),
     apply: (s) => s.addCharacter('railgun'),
   },
   {
@@ -33,7 +33,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '🛡️',
     weight: 6,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('blade'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('blade'),
     apply: (s) => s.addCharacter('blade'),
   },
   {
@@ -44,7 +44,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '🧪',
     weight: 6,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('field'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('field'),
     apply: (s) => s.addCharacter('field'),
   },
   {
@@ -55,7 +55,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '📡',
     weight: 5,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('beam'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('beam'),
     apply: (s) => s.addCharacter('beam'),
   },
   {
@@ -66,7 +66,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '🫧',
     weight: 5,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('orb'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('orb'),
     apply: (s) => s.addCharacter('orb'),
   },
   {
@@ -77,7 +77,7 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     emoji: '✴',
     weight: 5,
     maxStack: 1,
-    canAppear: (s) => s.characterCount < 5 && !s.hasCharacter('stun'),
+    canAppear: (s) => s.characterCount < s.maxCharacters && !s.hasCharacter('stun'),
     apply: (s) => s.addCharacter('stun'),
   },
 

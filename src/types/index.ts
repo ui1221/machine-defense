@@ -68,6 +68,7 @@ export interface StageConfig {
   difficulty: number  // 1-5
   barricadeHp: number
   enemyHpMult?: number
+  maxCharacters?: number
   startingCharacter: string
   spawnTable: SpawnEntry[]
   ambientSpawns?: AmbientSpawnConfig[]
@@ -89,6 +90,7 @@ export interface UpgradeOption {
 
 export interface BattleState {
   characterCount: number
+  maxCharacters: number
   level: number
   acquiredUpgrades: Map<string, number>
   addCharacter: (id: string) => void

@@ -101,7 +101,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   addCharacter(charId: string) {
-    if (this.characters.length >= MAX_CHARACTERS) return
+    if (this.characters.length >= this.stageMaxCharacters) return
     if (charId === 'rapid') charId = 'assault'
     if (this.characters.some(ch => ch.config.id === charId)) return
     const cfg = CHARACTERS[charId]
@@ -691,6 +691,10 @@ export class BattleScene extends Phaser.Scene {
     return this.pausedByUser
   }
 
+  private get stageMaxCharacters() {
+    return Math.min(MAX_CHARACTERS, this.stage.maxCharacters ?? MAX_CHARACTERS)
+  }
+
   toggleUserPause() {
     this.pausedByUser = !this.pausedByUser
     if (this.pausedByUser) this.inputManager.pause()
@@ -811,6 +815,7 @@ export class BattleScene extends Phaser.Scene {
   private buildBattleState(): BattleState {
     return {
       characterCount: this.characters.length,
+      maxCharacters: this.stageMaxCharacters,
       level: this.levelUpManager.level,
       acquiredUpgrades: this.levelUpManager.getAcquired(),
       addCharacter:      (id) => this.addCharacter(id),
