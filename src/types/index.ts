@@ -39,6 +39,7 @@ export interface EnemyConfig {
   size: number        // collision radius
   color?: number
   abilities?: EnemyAbility[]
+  knockbackResist?: number // 0 = full knockback, 1 = immune
 }
 
 export interface SpawnEntry {
@@ -108,6 +109,8 @@ export interface WeaponConfig {
   name: string
   description: string
   rarity: WeaponRarity
+  slot: EquipmentSlot
+  equipGroup: EquipmentEquipGroup
   atkMult: number
   atkSpeedMult: number  // < 1 = faster
   rangeMult: number
@@ -115,6 +118,8 @@ export interface WeaponConfig {
 }
 
 export type WeaponRarity = 'N' | 'R' | 'SR' | 'SSR'
+export type EquipmentSlot = 'weapon' | 'sensor' | 'module' | 'core'
+export type EquipmentEquipGroup = 'all' | 'non_blade' | 'blade_only'
 
 export interface OwnedWeapon {
   uid: string
@@ -149,6 +154,12 @@ export interface PermanentUpgrades {
   barricadeHpLevel: number
   equipmentLevel: number
   researchLevel: number
+  researchExpLevel: number
+  researchAtkLevel: number
+  researchCooldownLevel: number
+  researchRangeLevel: number
+  researchProjectileLevel: number
+  researchBarricadeLevel: number
 }
 
 export interface GameSave {

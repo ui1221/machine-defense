@@ -25,11 +25,13 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     id: 'brute', name: '重装型', emoji: '⬢',
     description: '遅いが高HP。',
     hp: 60, speed: 6, damage: 15, expReward: 15, size: 24, color: 0xb090ff,
+    knockbackResist: 0.45,
   },
   guard: {
     id: 'guard', name: '防盾型', emoji: '▣',
     description: '高めのHPで前線に残りやすい。',
     hp: 42, speed: 7, damage: 8, expReward: 10, size: 22, color: 0x55aaff,
+    knockbackResist: 0.35,
   },
   swarm: {
     id: 'swarm', name: '群体型', emoji: '·',
@@ -52,6 +54,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     description: '受けるダメージを軽減する。',
     hp: 85, speed: 5, damage: 18, expReward: 18, size: 25, color: 0x999999,
     abilities: ['armor'],
+    knockbackResist: 0.55,
   },
   fragile: {
     id: 'fragile', name: '脆弱型', emoji: '△',
@@ -78,6 +81,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     id: 'crawler', name: '低速型', emoji: '▾',
     description: '非常に遅いが、HPと攻撃力が高め。',
     hp: 30, speed: 4, damage: 10, expReward: 8, size: 20, color: 0x77cc88,
+    knockbackResist: 0.4,
   },
   core: {
     id: 'core', name: '中核型', emoji: '◎',
@@ -105,6 +109,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     id: 'mass', name: '質量型', emoji: '⬛',
     description: '超低速、高HP、高攻撃力。',
     hp: 110, speed: 3, damage: 25, expReward: 24, size: 28, color: 0x666677,
+    knockbackResist: 0.7,
   },
   elite: {
     id: 'elite', name: '精鋭型', emoji: '✹',
@@ -117,5 +122,6 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     description: '区画を制圧するための大型機。遅いが、非常に高い耐久と強い攻撃を持つ。',
     hp: 500, speed: 4, damage: 30, expReward: 80, size: 42, color: 0xff8844,
     abilities: ['warning_attack', 'boss'],
+    knockbackResist: 0.88,
   },
 }

@@ -7,10 +7,25 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '軽量ブレード',
     description: '攻撃力 +15%',
     rarity: 'N',
+    slot: 'weapon',
+    equipGroup: 'blade_only',
     atkMult: 1.15,
     atkSpeedMult: 1,
     rangeMult: 1,
     critChance: 0,
+  },
+  firecracker: {
+    id: 'firecracker',
+    emoji: '🧨',
+    name: '爆竹',
+    description: '攻撃力 +10% / 会心率 +1%',
+    rarity: 'N',
+    slot: 'weapon',
+    equipGroup: 'non_blade',
+    atkMult: 1.1,
+    atkSpeedMult: 1,
+    rangeMult: 1,
+    critChance: 0.01,
   },
   accel_module: {
     id: 'accel_module',
@@ -18,6 +33,8 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '加速モジュール',
     description: 'クールタイム -18%',
     rarity: 'N',
+    slot: 'module',
+    equipGroup: 'all',
     atkMult: 1,
     atkSpeedMult: 0.82,
     rangeMult: 1,
@@ -29,10 +46,25 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '強化ブレード',
     description: '攻撃力 +28% / 会心率 +2%',
     rarity: 'R',
+    slot: 'weapon',
+    equipGroup: 'blade_only',
     atkMult: 1.28,
     atkSpeedMult: 1,
     rangeMult: 1,
     critChance: 0.02,
+  },
+  compact_pistol: {
+    id: 'compact_pistol',
+    emoji: '🔫',
+    name: '小型自動拳銃',
+    description: '攻撃力 +22% / クールタイム -5%',
+    rarity: 'R',
+    slot: 'weapon',
+    equipGroup: 'non_blade',
+    atkMult: 1.22,
+    atkSpeedMult: 0.95,
+    rangeMult: 1,
+    critChance: 0.015,
   },
   control_core: {
     id: 'control_core',
@@ -40,6 +72,8 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '制御コア',
     description: '攻撃力 +18% / クールタイム -8% / 会心率 +2%',
     rarity: 'R',
+    slot: 'core',
+    equipGroup: 'all',
     atkMult: 1.18,
     atkSpeedMult: 0.92,
     rangeMult: 1,
@@ -51,6 +85,8 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: 'センサー拡張',
     description: '索敵範囲 +25% / 会心率 +3%',
     rarity: 'R',
+    slot: 'sensor',
+    equipGroup: 'all',
     atkMult: 1,
     atkSpeedMult: 1,
     rangeMult: 1.25,
@@ -62,10 +98,25 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '高出力ブレード',
     description: '攻撃力 +48% / クールタイム +18% / 会心率 +4%',
     rarity: 'SR',
+    slot: 'weapon',
+    equipGroup: 'blade_only',
     atkMult: 1.48,
     atkSpeedMult: 1.18,
     rangeMult: 1,
     critChance: 0.04,
+  },
+  ion_rifle: {
+    id: 'ion_rifle',
+    emoji: '☄️',
+    name: 'イオンライフル',
+    description: '攻撃力 +40% / 会心率 +5%',
+    rarity: 'SR',
+    slot: 'weapon',
+    equipGroup: 'non_blade',
+    atkMult: 1.4,
+    atkSpeedMult: 1,
+    rangeMult: 1,
+    critChance: 0.05,
   },
   overdrive_core: {
     id: 'overdrive_core',
@@ -73,6 +124,8 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '過駆動コア',
     description: '攻撃力 +35% / クールタイム -12% / 会心率 +4%',
     rarity: 'SR',
+    slot: 'core',
+    equipGroup: 'all',
     atkMult: 1.35,
     atkSpeedMult: 0.88,
     rangeMult: 1,
@@ -84,6 +137,8 @@ export const WEAPONS: Record<string, WeaponConfig> = {
     name: '特異点ユニット',
     description: '攻撃力 +45% / クールタイム -18% / 索敵範囲 +15% / 会心率 +6%',
     rarity: 'SSR',
+    slot: 'core',
+    equipGroup: 'all',
     atkMult: 1.45,
     atkSpeedMult: 0.82,
     rangeMult: 1.15,
@@ -93,6 +148,19 @@ export const WEAPONS: Record<string, WeaponConfig> = {
 
 export const WEAPON_IDS = Object.keys(WEAPONS)
 export const WEAPON_DROP_RATE = 0.001
+
+export function canEquipWeaponToCharacter(weapon: WeaponConfig, charId: string) {
+  if (weapon.equipGroup === 'blade_only') return charId === 'blade'
+  if (weapon.equipGroup === 'non_blade') return charId !== 'blade'
+  return true
+}
+
+export function equipmentSlotLabel(slot: WeaponConfig['slot']) {
+  if (slot === 'weapon') return '武器'
+  if (slot === 'sensor') return 'センサー'
+  if (slot === 'module') return 'モジュール'
+  return 'コア'
+}
 
 export const RARITY_COLORS: Record<WeaponRarity, number> = {
   N: 0x9aa4b2,

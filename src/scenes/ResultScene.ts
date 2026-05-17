@@ -72,7 +72,7 @@ export class ResultScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5)
     this.add.text(portraitX, portraitY + 106, '立ち絵仮置き', {
-      fontSize: '11px',
+      fontSize: '15px',
       color: '#667788',
     }).setOrigin(0.5)
 
@@ -113,7 +113,7 @@ export class ResultScene extends Phaser.Scene {
     this.add.rectangle(x + 130, y + 62, 220, 46, 0x1b2744)
       .setStrokeStyle(1, 0x445577)
     this.add.text(x + 38, y + 50, 'CREDIT', {
-      fontSize: '12px',
+      fontSize: '14px',
       color: '#8899aa',
     })
     this.add.text(x + 238, y + 50, `+${creditReward}`, {
@@ -156,12 +156,12 @@ export class ResultScene extends Phaser.Scene {
         fontSize: '18px',
       })
       this.add.text(x + 56, cardY - 11, `${weapon.rarity} ${weapon.name}`, {
-        fontSize: '12px',
+        fontSize: '14px',
         color: '#ffffff',
         fontStyle: 'bold',
       })
       this.add.text(x + 56, cardY + 4, weapon.description, {
-        fontSize: '9px',
+        fontSize: '15px',
         color: '#88aacc',
       })
     })
@@ -199,14 +199,14 @@ export class ResultScene extends Phaser.Scene {
         fontSize: '16px',
       })
       this.add.text(x + 44, rowY - 7, ch.name, {
-        fontSize: '12px',
+        fontSize: '14px',
         color: '#dce8ff',
         fontStyle: 'bold',
       })
       this.add.rectangle(x + 206, rowY, 150, 8, 0x1b2744)
       this.add.rectangle(x + 136 + barW / 2, rowY, barW, 8, 0x66ddff, 0.85)
       this.add.text(x + w - 18, rowY - 8, `${stat.damage}`, {
-        fontSize: '13px',
+        fontSize: '15px',
         color: '#ffffff',
         fontStyle: 'bold',
       }).setOrigin(1, 0)

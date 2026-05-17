@@ -6,7 +6,7 @@ import {
 import { STAGES } from '../data/stages'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { WEAPONS, WEAPON_DROP_RATE, RARITY_WEIGHTS } from '../data/weapons'
+import { canEquipWeaponToCharacter, WEAPONS, WEAPON_DROP_RATE, RARITY_WEIGHTS } from '../data/weapons'
 import { Character } from '../objects/Character'
 import { Enemy } from '../objects/Enemy'
 import { Bullet } from '../objects/Bullet'
@@ -51,6 +51,7 @@ export class BattleScene extends Phaser.Scene {
   elapsedMs = 0
   private pausedByUser = false
   private speedIndex = 0
+  private expMult = 1
   private readonly speedOptions = [1, 2]
 
   constructor() { super('BattleScene') }
@@ -68,6 +69,7 @@ export class BattleScene extends Phaser.Scene {
     this.elapsedMs = 0
     this.pausedByUser = false
     this.speedIndex = 0
+    this.expMult = 1
   }
 
   create() {
@@ -87,7 +89,8 @@ export class BattleScene extends Phaser.Scene {
     this.bullets = this.add.group({ runChildUpdate: false })
 
     const save = this.loadSave()
-    this.barricade = new Barricade(this, DEFAULT_BARRICADE_HP + save.upgrades.barricadeHpLevel * 5)
+    this.expMult = 1 + save.upgrades.researchExpLevel * 0.04
+    this.barricade = new Barricade(this, DEFAULT_BARRICADE_HP + save.upgrades.barricadeHpLevel * 5 + save.upgrades.researchBarricadeLevel * 50)
     this.spawnManager = new SpawnManager(this.stage)
     this.inputManager = new InputManager(this)
     this.targeting = new TargetingSystem()
@@ -570,7 +573,7 @@ export class BattleScene extends Phaser.Scene {
       this.droppedWeapons.push(id)
       this.showDropEffect(enemy.x, enemy.y, WEAPONS[id].emoji)
     }
-    const leveledUp = this.levelUpManager.addExp(enemy.expReward)
+    const leveledUp = this.levelUpManager.addExp(enemy.expReward * this.expMult)
     this.events.emit('expChanged')
     if (leveledUp) this.onLevelUp()
     enemy.destroy()
@@ -701,6 +704,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onLevelUp() {
+    if (!this.levelUpManager.consumePendingLevelUp()) return
     this.scene.pause()
     this.inputManager.pause()
     const state = this.buildBattleState()
@@ -712,24 +716,30 @@ export class BattleScene extends Phaser.Scene {
     const opt = UPGRADE_POOL.find(o => o.id === id)
     if (opt) opt.apply(this.buildBattleState())
     this.levelUpManager.recordChoice(id)
+    this.events.emit('levelUpDone')
+    if (this.levelUpManager.pendingLevelUps > 0) {
+      this.onLevelUp()
+      return
+    }
     this.scene.resume()
     this.inputManager.resume()
-    this.events.emit('levelUpDone')
   }
 
   private applyEquippedWeapon(ch: Character) {
     const save = this.loadSave()
-    const equipped = save.ownedWeapons.find(w => w.equippedCharId === ch.config.id)
-    if (!equipped) return
-    const weapon = WEAPONS[equipped.weaponId]
-    if (!weapon) return
-    const levelBonus = 1 + equipped.level * 0.1
-    const bonus = levelBonus * (1 + save.upgrades.equipmentLevel * 0.03)
-    if (weapon.atkMult !== 1)      ch.atkMult      *= 1 + (weapon.atkMult - 1) * bonus
-    if (weapon.atkSpeedMult < 1)   ch.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
-    if (weapon.atkSpeedMult > 1)   ch.atkSpeedMult *= weapon.atkSpeedMult
-    if (weapon.rangeMult !== 1)    ch.rangeMult    *= 1 + (weapon.rangeMult - 1) * bonus
-    if (weapon.critChance > 0)     ch.critChance   += weapon.critChance * bonus
+    const equippedItems = save.ownedWeapons.filter(w => w.equippedCharId === ch.config.id)
+    for (const equipped of equippedItems) {
+      const weapon = WEAPONS[equipped.weaponId]
+      if (!weapon) continue
+      if (!canEquipWeaponToCharacter(weapon, ch.config.id)) continue
+      const levelBonus = 1 + equipped.level * 0.1
+      const bonus = levelBonus * (1 + save.upgrades.equipmentLevel * 0.03)
+      if (weapon.atkMult !== 1)      ch.atkMult      *= 1 + (weapon.atkMult - 1) * bonus
+      if (weapon.atkSpeedMult < 1)   ch.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
+      if (weapon.atkSpeedMult > 1)   ch.atkSpeedMult *= weapon.atkSpeedMult
+      if (weapon.rangeMult !== 1)    ch.rangeMult    *= 1 + (weapon.rangeMult - 1) * bonus
+      if (weapon.critChance > 0)     ch.critChance   += weapon.critChance * bonus
+    }
   }
 
   private applyPermanentUpgrade(ch: Character) {
@@ -744,6 +754,16 @@ export class BattleScene extends Phaser.Scene {
     if (cooldownBonusSteps > 0) {
       const cooldownReduction = Math.min(0.08, cooldownBonusSteps * 0.005)
       ch.atkSpeedMult *= 1 - cooldownReduction
+    }
+    if (save.upgrades.researchAtkLevel > 0) ch.atkMult *= 1 + save.upgrades.researchAtkLevel * 0.05
+    if (save.upgrades.researchCooldownLevel > 0) ch.atkSpeedMult *= 1 - save.upgrades.researchCooldownLevel * 0.01
+    if (save.upgrades.researchRangeLevel > 0) {
+      const mult = 1 + save.upgrades.researchRangeLevel * 0.02
+      ch.rangeMult *= mult
+      ch.areaMult *= mult
+    }
+    if (save.upgrades.researchProjectileLevel > 0 && ch.config.attackType !== 'beam' && ch.config.attackType !== 'slash') {
+      ch.actionCount += 1
     }
   }
 

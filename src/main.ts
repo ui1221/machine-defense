@@ -6,10 +6,33 @@ import { BattleScene } from './scenes/BattleScene'
 import { BattleUIScene } from './scenes/BattleUIScene'
 import { ResultScene } from './scenes/ResultScene'
 
-const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean } = {
+const TEXT_VISUAL_OFFSET_Y = 2
+const TEXT_PADDING_TOP = 4
+const TEXT_PADDING_BOTTOM = 2
+
+const originalTextFactory = Phaser.GameObjects.GameObjectFactory.prototype.text
+Phaser.GameObjects.GameObjectFactory.prototype.text = function (
+  x: number,
+  y: number,
+  text: string | string[],
+  style?: Phaser.Types.GameObjects.Text.TextStyle,
+) {
+  const normalizedStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+    ...(style ?? {}),
+    padding: {
+      top: TEXT_PADDING_TOP,
+      bottom: TEXT_PADDING_BOTTOM,
+      ...(typeof style?.padding === 'object' ? style.padding : {}),
+    },
+  }
+  return originalTextFactory.call(this, x, y + TEXT_VISUAL_OFFSET_Y, text, normalizedStyle)
+}
+
+const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean; resolution?: number } = {
   type: Phaser.AUTO,
   width: GAME_W,
   height: GAME_H,
+  resolution: Math.min(window.devicePixelRatio || 1, 2),
   backgroundColor: '#111122',
   parent: document.body,
   scene: [BootScene, HomeScene, BattleScene, BattleUIScene, ResultScene],

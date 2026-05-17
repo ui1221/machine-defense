@@ -3,37 +3,38 @@ import { GAME_W, GAME_H } from '../constants'
 import { STAGES } from '../data/stages'
 import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { RARITY_COLORS, WEAPONS } from '../data/weapons'
+import { canEquipWeaponToCharacter, equipmentSlotLabel, RARITY_COLORS, WEAPONS } from '../data/weapons'
+import { RESEARCH_ITEMS, type ResearchItem } from '../data/research'
 import { loadSave, saveGame, upgradeCost } from '../systems/SaveData'
-import type { GameSave, OwnedWeapon } from '../types'
+import type { EquipmentSlot, GameSave, OwnedWeapon } from '../types'
 
 const TAB_H = 72
 const CONTENT_TOP = 100
 const STAGES_PER_PAGE = 6
-const ITEMS_PER_PAGE = 12
-const EQUIP_ITEMS_PER_PAGE = 10
 const SIDE_FRAME_X = GAME_W - 100
 const SIDE_FRAME_Y = CONTENT_TOP + 148
 const SIDE_FRAME_W = 150
 const SIDE_FRAME_H = 230
 const SIDE_FRAME_FILL = 0x101827
 const SIDE_FRAME_STROKE = 0x4d6388
+const EQUIPMENT_SLOT_ORDER: EquipmentSlot[] = ['weapon', 'core', 'sensor', 'module']
+type ShopMode = 'menu' | 'buy' | 'sell' | 'upgrade' | 'research'
 
 export class HomeScene extends Phaser.Scene {
   private save!: GameSave
   private panels: Phaser.GameObjects.Container[] = []
   private tabTexts: Phaser.GameObjects.Text[] = []
-  private shellObjects: Array<Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text> = []
+  private shellObjects: Array<Phaser.GameObjects.GameObject & { setVisible: (visible: boolean) => unknown }> = []
   private hubHomeContainer?: Phaser.GameObjects.Container
   private backButtonContainer?: Phaser.GameObjects.Container
+  private creditText?: Phaser.GameObjects.Text
   private inHubMenu = false
   private activeTab = 0
   private stagePage = 0
-  private itemPage = 0
-  private equipPage = 0
   private selectedCharacterId = 'assault'
-  private selectedWeaponUid: string | null = null
   private selectingEquipmentForCharId: string | null = null
+  private selectingEquipmentSlot: EquipmentSlot | null = null
+  private shopMode: ShopMode = 'menu'
 
   constructor() { super('HomeScene') }
 
@@ -43,17 +44,15 @@ export class HomeScene extends Phaser.Scene {
     this.tabTexts = []
     this.shellObjects = []
     this.activeTab = 0
-    this.itemPage = 0
-    this.equipPage = 0
     this.inHubMenu = false
     this.selectedCharacterId = 'assault'
     this.selectingEquipmentForCharId = null
+    this.selectingEquipmentSlot = null
+    this.shopMode = 'menu'
 
-    const title = this.add.text(GAME_W / 2, 30, 'MACHINE DEFENCE', {
-      fontSize: '24px', color: '#ff6644', fontStyle: 'bold',
-    }).setOrigin(0.5)
+    this.buildTopStatus()
     const tabBand = this.add.rectangle(GAME_W / 2, GAME_H - TAB_H / 2, GAME_W, TAB_H, 0x0a0a1a).setDepth(10)
-    this.shellObjects.push(title, tabBand)
+    this.shellObjects.push(tabBand)
 
     this.panels.push(this.buildStagePanel())
     this.panels.push(this.buildCharPanel())
@@ -76,7 +75,7 @@ export class HomeScene extends Phaser.Scene {
         .setDepth(11)
         .setInteractive({ useHandCursor: true })
       const txt = this.add.text(tx, GAME_H - TAB_H / 2, tab.label, {
-        fontSize: '12px', color: i === 0 ? '#ffffff' : '#445566',
+        fontSize: '14px', color: i === 0 ? '#ffffff' : '#445566',
       }).setOrigin(0.5).setDepth(12)
 
       tabBg.on('pointerdown', () => this.switchTab(i))
@@ -108,7 +107,7 @@ export class HomeScene extends Phaser.Scene {
     this.inHubMenu = true
     this.hubHomeContainer?.setVisible(false)
     this.shellObjects.forEach(obj => obj.setVisible(true))
-    this.backButtonContainer?.setVisible(true)
+    this.backButtonContainer?.setVisible(false)
   }
 
   private returnToHubHome() {
@@ -117,6 +116,24 @@ export class HomeScene extends Phaser.Scene {
     this.shellObjects.forEach(obj => obj.setVisible(true))
     this.backButtonContainer?.setVisible(false)
     this.hubHomeContainer?.setVisible(true)
+  }
+
+  private buildTopStatus() {
+    const faceBg = this.add.circle(34, 31, 18, 0x202a40, 0.95).setDepth(20)
+    const face = this.add.text(34, 30, CHARACTERS.assault.emoji, {
+      fontSize: '23px',
+    }).setOrigin(0.5).setDepth(21)
+    const label = this.add.text(62, 22, 'CREDIT', {
+      fontSize: '13px', color: '#7f91ad', fontStyle: 'bold',
+    }).setDepth(20)
+    this.creditText = this.add.text(62, 38, `${this.save.credits}`, {
+      fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
+    }).setDepth(20)
+    this.shellObjects.push(faceBg, face, label, this.creditText)
+  }
+
+  private refreshTopStatus() {
+    if (this.creditText) this.creditText.setText(`${this.loadSave().credits}`)
   }
 
   private buildHubHome() {
@@ -132,7 +149,7 @@ export class HomeScene extends Phaser.Scene {
       fontSize: '16px', color: '#d7e3f4', fontStyle: 'bold',
     })
     const roomNote = this.add.text(28, 170, '背景全面に室内ビジュアルを配置する想定', {
-      fontSize: '12px', color: '#8292aa',
+      fontSize: '14px', color: '#8292aa',
     })
     const portraitShade = this.add.rectangle(GAME_W - 92, 404, 232, 720, 0x09101a, 0.18)
     const portrait = this.add.image(GAME_W - 76, 632, 'home_portrait').setOrigin(0.5).setScale(0.78)
@@ -140,7 +157,7 @@ export class HomeScene extends Phaser.Scene {
       fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
     const portraitNote = this.add.text(GAME_W - 100, 668, '立ち絵仮置き', {
-      fontSize: '11px', color: '#8292aa',
+      fontSize: '15px', color: '#8292aa',
     }).setOrigin(0.5)
     c.add([bg, tint, roomTitle, roomNote, portraitShade, portrait, portraitName, portraitNote])
     this.shellObjects.forEach(obj => obj.setVisible(true))
@@ -152,7 +169,7 @@ export class HomeScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x5a7696)
       .setInteractive({ useHandCursor: true })
     const txt = this.add.text(48, 30, '< 戻る', {
-      fontSize: '12px', color: '#ffffff', fontStyle: 'bold',
+      fontSize: '14px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
     bg.on('pointerdown', () => this.returnToHubHome())
     c.add([bg, txt])
@@ -190,7 +207,7 @@ export class HomeScene extends Phaser.Scene {
       .setStrokeStyle(1, debugUnlocked ? 0x44cc88 : 0x666688)
       .setInteractive({ useHandCursor: true })
     const debugText = this.add.text(GAME_W - 84, CONTENT_TOP - 20, debugUnlocked ? '全解放中' : 'DEBUG 全解放', {
-      fontSize: '11px', color: '#ffffff',
+      fontSize: '15px', color: '#ffffff',
     }).setOrigin(0.5)
     debugBtn.on('pointerdown', () => this.unlockAllStagesForDebug())
     c.add([debugBtn, debugText])
@@ -214,10 +231,10 @@ export class HomeScene extends Phaser.Scene {
         fontSize: '20px', color: unlocked ? '#ffffff' : '#666677',
       })
       const desc = this.add.text(40, y + 36, stage.description, {
-        fontSize: '13px', color: unlocked ? '#888899' : '#555566',
+        fontSize: '15px', color: unlocked ? '#888899' : '#555566',
       })
       const mult = this.add.text(GAME_W - 40, y + 10, `HP x${(stage.enemyHpMult ?? 1).toFixed(2)}`, {
-        fontSize: '12px', color: unlocked ? '#ffdd88' : '#555566',
+        fontSize: '14px', color: unlocked ? '#ffdd88' : '#555566',
       }).setOrigin(1, 0)
 
       if (unlocked) {
@@ -235,7 +252,7 @@ export class HomeScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x445566)
       .setInteractive({ useHandCursor: enabled })
     const text = this.add.text(x, y, label, {
-      fontSize: '12px', color: enabled ? '#ffffff' : '#666677',
+      fontSize: '14px', color: enabled ? '#ffffff' : '#666677',
     }).setOrigin(0.5)
     if (enabled) bg.on('pointerdown', onClick)
     c.add([bg, text])
@@ -266,6 +283,7 @@ export class HomeScene extends Phaser.Scene {
     this.save = this.loadSave()
     this.save.debugUnlockAllStages = true
     saveGame(this.save)
+    this.refreshTopStatus()
     this.rebuildPanel(0, this.buildStagePanel())
     this.panels[0].setVisible(true)
   }
@@ -288,64 +306,90 @@ export class HomeScene extends Phaser.Scene {
     const baseCrit = (cfg.baseCritChance ?? 0) * 100
     const currentCrit = Math.min(65, baseCrit + level * critGrowth * 100)
     const nextCrit = Math.min(65, baseCrit + nextLevel * critGrowth * 100)
-    const cooldownBonus = Math.floor(level / 10) * 0.5
-    const equipped = this.save.ownedWeapons.find(w => w.equippedCharId === cfg.id)
-    const weapon = equipped ? WEAPONS[equipped.weaponId] : null
+    const equippedBySlot = this.getEquippedBySlot(cfg.id)
+    const equipmentStats = this.equipmentStatBonus(cfg.id)
+    const cooldownNow = cfg.atkSpeed * (1 - Math.min(0.08, Math.floor(level / 10) * 0.005))
+    const atkEquipBonus = currentAtk * (equipmentStats.atkMult - 1)
+    const cooldownEquipBonus = cooldownNow * (equipmentStats.atkSpeedMult - 1)
+    const critEquipBonus = equipmentStats.critAdd * 100
 
     c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 22, 'キャラ管理', {
       fontSize: '17px', color: '#aaaacc',
     }).setOrigin(0.5))
-    const card = this.add.rectangle(GAME_W / 2, CONTENT_TOP + 190, GAME_W - 34, 368, 0x101827).setStrokeStyle(2, 0x334466)
-    c.add(card)
-    const side = this.addSideFrame(c)
+    const side = { x: SIDE_FRAME_X, y: SIDE_FRAME_Y, w: SIDE_FRAME_W, h: SIDE_FRAME_H }
+    const divider = this.add.rectangle(250, CONTENT_TOP + 188, 1, 250, 0x2a344f, 0.55)
+    c.add(divider)
     const icon = this.add.text(side.x, side.y - 38, cfg.emoji, { fontSize: '58px' }).setOrigin(0.5)
     const sideName = this.add.text(side.x, side.y + 38, cfg.name, {
       fontSize: '15px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
     const sideLevel = this.add.text(side.x, side.y + 62, `Lv.${level}/${levelCap}`, {
-      fontSize: '13px', color: '#ffdd88', fontStyle: 'bold',
+      fontSize: '15px', color: '#ffdd88', fontStyle: 'bold',
     }).setOrigin(0.5)
     const name = this.add.text(36, CONTENT_TOP + 34, cfg.name, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
-    const desc = this.add.text(36, CONTENT_TOP + 66, cfg.description, { fontSize: '12px', color: '#7f91ad', wordWrap: { width: 260 } })
+    const desc = this.add.text(36, CONTENT_TOP + 66, cfg.description, { fontSize: '14px', color: '#7f91ad', wordWrap: { width: 260 } })
     const levelTitle = this.add.text(38, CONTENT_TOP + 108, `Lv.${level}/${levelCap}`, {
       fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
     })
     const stats = this.add.text(38, CONTENT_TOP + 138, [
-      `攻撃: ${currentAtk.toFixed(1)} -> ${nextAtk.toFixed(1)}`,
-      `冷却: ${(cfg.atkSpeed / 1000).toFixed(1)}秒 / 強化補正 -${cooldownBonus.toFixed(1)}%`,
-      `会心: ${currentCrit.toFixed(2)}% -> ${nextCrit.toFixed(2)}%`,
+      `攻撃: ${currentAtk.toFixed(1)}${this.formatSigned(atkEquipBonus, 1)}`,
+      `冷却: ${(cooldownNow / 1000).toFixed(2)}秒${this.formatSigned(cooldownEquipBonus / 1000, 2)}秒`,
+      `会心: ${currentCrit.toFixed(2)}%${this.formatSigned(critEquipBonus, 2)}%`,
       `射程: ${cfg.range}`,
     ].join('\n'), { fontSize: '14px', color: '#d8e6ff', lineSpacing: 7 })
 
-    const slotBg = this.add.rectangle(134, CONTENT_TOP + 260, 204, 56, weapon ? 0x17213a : 0x0d1220)
-      .setStrokeStyle(2, weapon ? RARITY_COLORS[weapon.rarity] : 0x334466)
-      .setInteractive({ useHandCursor: true })
-    const slotText = weapon && equipped
-      ? `装備: ${weapon.emoji} ${weapon.name}  Lv.${equipped.level}`
-      : '装備: 空きスロット'
-    const slotLabel = this.add.text(134, CONTENT_TOP + 260, slotText, {
-      fontSize: '12px', color: weapon ? '#ffffff' : '#667788', align: 'center',
-    }).setOrigin(0.5)
-    slotBg.on('pointerdown', () => {
-      this.selectingEquipmentForCharId = cfg.id
-      this.selectedWeaponUid = equipped?.uid ?? null
-      this.equipPage = 0
-      this.rebuildPanel(1, this.buildCharPanel())
-      this.panels[1].setVisible(true)
+    const slotObjects: Phaser.GameObjects.GameObject[] = []
+    EQUIPMENT_SLOT_ORDER.forEach((slot, i) => {
+      const equipped = equippedBySlot.get(slot)
+      const weapon = equipped ? WEAPONS[equipped.weaponId] : null
+      const sx = 136
+      const sy = CONTENT_TOP + 274 + i * 38
+      const slotBg = this.add.rectangle(sx, sy, 196, 32, weapon ? 0x17213a : 0x0d1220)
+        .setStrokeStyle(1, weapon ? RARITY_COLORS[weapon.rarity] : 0x334466)
+        .setInteractive({ useHandCursor: true })
+      const label = weapon && equipped
+        ? `${equipmentSlotLabel(slot)}\n${weapon.emoji} ${this.equipmentDisplayName(weapon.name, equipped.level)}`
+        : `${equipmentSlotLabel(slot)}\n空き`
+      const slotLabel = this.add.text(sx, sy, label, {
+        fontSize: '12px', color: weapon ? '#ffffff' : '#667788', align: 'center',
+      }).setOrigin(0.5)
+      slotBg.on('pointerdown', () => {
+        this.selectingEquipmentForCharId = cfg.id
+        this.selectingEquipmentSlot = slot
+        this.rebuildPanel(1, this.buildCharPanel())
+        this.panels[1].setVisible(true)
+      })
+      slotObjects.push(slotBg, slotLabel)
     })
 
     const canUpgrade = rawLevel < levelCap && this.save.credits >= cost
-    const upgradeBtn = this.add.rectangle(GAME_W - 112, CONTENT_TOP + 286, 150, 40, canUpgrade ? 0x225544 : 0x333344)
+    const upgradeBtn = this.add.rectangle(136, CONTENT_TOP + 224, 196, 36, canUpgrade ? 0x225544 : 0x333344)
       .setStrokeStyle(1, canUpgrade ? 0x44cc88 : 0x555566)
       .setInteractive({ useHandCursor: canUpgrade })
-    const upgradeLabel = rawLevel >= levelCap ? `Lv.${level}/${levelCap}\nCAP` : `Lv.${level}/${levelCap} 強化 +1\n${cost} CREDIT`
-    const upgradeText = this.add.text(GAME_W - 112, CONTENT_TOP + 286, upgradeLabel, {
-      fontSize: '12px', color: canUpgrade ? '#ffffff' : '#777788', align: 'center',
+    const upgradeLabel = rawLevel >= levelCap ? `Lv.${level}/${levelCap} CAP` : `Lv.${level} -> ${nextLevel}  ${cost} CREDIT`
+    const upgradeText = this.add.text(136, CONTENT_TOP + 224, upgradeLabel, {
+      fontSize: '14px', color: canUpgrade ? '#ffffff' : '#777788', align: 'center',
     }).setOrigin(0.5)
-    if (canUpgrade) upgradeBtn.on('pointerdown', () => this.buyCharacterUpgrade(upgradeKey))
-    c.add([icon, sideName, sideLevel, name, desc, levelTitle, stats, slotBg, slotLabel, upgradeBtn, upgradeText])
+    if (canUpgrade) upgradeBtn.on('pointerdown', () => {
+      this.showConfirmDialog(
+        `${cfg.name}\nLv.${level} -> Lv.${nextLevel}\n攻撃: ${currentAtk.toFixed(1)} -> ${nextAtk.toFixed(1)}\n会心: ${currentCrit.toFixed(2)}% -> ${nextCrit.toFixed(2)}%\n${cost} CREDIT で強化します。\nよろしいですか？`,
+        () => this.buyCharacterUpgrade(upgradeKey),
+      )
+    })
 
-    if (this.selectingEquipmentForCharId === cfg.id) this.buildCharacterEquipList(c, cfg.id)
+    const isSelectingEquipment = this.selectingEquipmentForCharId === cfg.id
+    if (isSelectingEquipment) {
+      icon.setVisible(false)
+      sideName.setVisible(false)
+      sideLevel.setVisible(false)
+      upgradeBtn.setVisible(false)
+      upgradeText.setVisible(false)
+    }
+    c.add(isSelectingEquipment
+      ? [name, desc, levelTitle, stats, ...slotObjects]
+      : [icon, sideName, sideLevel, name, desc, levelTitle, stats, ...slotObjects, upgradeBtn, upgradeText])
+
+    if (isSelectingEquipment) this.buildCharacterEquipList(c, cfg.id)
     this.buildCharacterSelector(c, cfg.id)
     return c
   }
@@ -361,11 +405,12 @@ export class HomeScene extends Phaser.Scene {
       const emoji = this.add.text(x, y - 2, ch.emoji, { fontSize: '22px' }).setOrigin(0.5)
       const lv = Number(this.save.upgrades[(ch.id + 'AtkLevel') as keyof GameSave['upgrades']] ?? 0)
       const lvText = this.add.text(x, y + 29, `Lv.${lv}`, {
-        fontSize: '12px', color: selected ? '#ffffff' : '#a8b8d0', fontStyle: selected ? 'bold' : '',
+        fontSize: '14px', color: selected ? '#ffffff' : '#a8b8d0', fontStyle: selected ? 'bold' : '',
       }).setOrigin(0.5)
       bg.on('pointerdown', () => {
         this.selectedCharacterId = ch.id
         this.selectingEquipmentForCharId = null
+        this.selectingEquipmentSlot = null
         this.rebuildPanel(1, this.buildCharPanel())
         this.panels[1].setVisible(true)
       })
@@ -374,119 +419,98 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private buildCharacterEquipList(c: Phaser.GameObjects.Container, charId: string) {
-    const x = GAME_W / 2
-    const y = CONTENT_TOP + 272
-    const bg = this.add.rectangle(x, y + 92, GAME_W - 58, 220, 0x070b14, 0.96)
-      .setStrokeStyle(2, 0x5a7696)
-      .setDepth(40)
-    const title = this.add.text(38, y - 4, '装備を選択', {
-      fontSize: '14px', color: '#ffffff', fontStyle: 'bold',
-    }).setDepth(41)
-    const close = this.add.rectangle(GAME_W - 52, y + 4, 46, 24, 0x222233)
-      .setStrokeStyle(1, 0x667788)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(41)
-    const closeText = this.add.text(GAME_W - 52, y + 4, '閉じる', {
-      fontSize: '10px', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(42)
+    const slot = this.selectingEquipmentSlot ?? 'weapon'
+    const current = this.getEquippedBySlot(charId).get(slot)
+    const list = this.add.container(0, 0).setDepth(45)
+    c.add(list)
+
+    const panelW = (GAME_W - 54) / 2
+    const panelX = GAME_W - 20 - panelW / 2
+    const viewTop = CONTENT_TOP + 16
+    const viewBottom = GAME_H - TAB_H - 76
+    const viewHeight = viewBottom - viewTop
+    const cardH = 74
+    const gap = 8
+    const slotItems = this.save.ownedWeapons.filter(owned => {
+      const weapon = WEAPONS[owned.weaponId]
+      return weapon?.slot === slot && canEquipWeaponToCharacter(weapon, charId)
+    })
+    const contentHeight = Math.max(viewHeight, 40 + slotItems.length * (cardH + gap) + 8)
+    const maxScroll = Math.max(0, contentHeight - viewHeight)
+    let scrollY = 0
+
+    const maskShape = this.add.rectangle(panelX, (viewTop + viewBottom) / 2, panelW + 4, viewHeight, 0xffffff)
+    maskShape.setVisible(false)
+    const mask = maskShape.createGeometryMask()
+    list.setMask(mask)
+    c.add(maskShape)
+
+    const title = this.add.text(panelX, viewTop - 22, equipmentSlotLabel(slot), {
+      fontSize: '15px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const close = this.add.text(panelX + panelW / 2 - 10, viewTop - 23, 'x', {
+      fontSize: '18px', color: '#aab8cc', fontStyle: 'bold',
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
     close.on('pointerdown', () => {
       this.selectingEquipmentForCharId = null
+      this.selectingEquipmentSlot = null
       this.rebuildPanel(1, this.buildCharPanel())
       this.panels[1].setVisible(true)
     })
-    c.add([bg, title, close, closeText])
+    c.add([title, close])
 
-    const current = this.save.ownedWeapons.find(w => w.equippedCharId === charId)
-    const unequip = this.add.rectangle(92, y + 32, 112, 24, current ? 0x442222 : 0x222233)
+    const applyScroll = (next: number) => {
+      scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
+      list.y = -scrollY
+    }
+    this.bindPanelScroll(c, panelX, (viewTop + viewBottom) / 2, panelW + 4, viewHeight, delta => applyScroll(scrollY + delta))
+
+    const emptyY = viewTop + 4
+    const emptyBg = this.add.rectangle(panelX, emptyY + 16, panelW, 32, current ? 0x442222 : 0x222233, 0.92)
       .setStrokeStyle(1, current ? 0xaa5555 : 0x555566)
       .setInteractive({ useHandCursor: !!current })
-      .setDepth(41)
-    const unequipText = this.add.text(92, y + 32, '外す', {
-      fontSize: '11px', color: current ? '#ffffff' : '#777788',
-    }).setOrigin(0.5).setDepth(42)
-    if (current) unequip.on('pointerdown', () => this.unequipCharacterWeapon(charId))
-    c.add([unequip, unequipText])
+    const emptyText = this.add.text(panelX, emptyY + 16, current ? '\u5916\u3059' : '\u7a7a\u304d', {
+      fontSize: '14px', color: current ? '#ffffff' : '#777788', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    if (current) emptyBg.on('pointerdown', () => this.unequipCharacterWeapon(charId, slot))
+    list.add([emptyBg, emptyText])
 
-    const pageCount = Math.max(1, Math.ceil(this.save.ownedWeapons.length / EQUIP_ITEMS_PER_PAGE))
-    this.equipPage = Phaser.Math.Clamp(this.equipPage, 0, pageCount - 1)
-    const start = this.equipPage * EQUIP_ITEMS_PER_PAGE
-    const items = this.save.ownedWeapons.slice(start, start + EQUIP_ITEMS_PER_PAGE)
-    if (items.length === 0) {
-      c.add(this.add.text(GAME_W / 2, y + 78, '装備できるアイテムがありません。', {
-        fontSize: '13px', color: '#667788',
-      }).setOrigin(0.5).setDepth(41))
+    if (slotItems.length === 0) {
+      const none = this.add.text(panelX, viewTop + 74, '\u88c5\u5099\u3067\u304d\u308b\n\u30a2\u30a4\u30c6\u30e0\u306a\u3057', {
+        fontSize: '13px', color: '#667788', align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5)
+      list.add(none)
       return
     }
 
-    const pageText = this.add.text(GAME_W - 52, y + 32, `${this.equipPage + 1}/${pageCount}`, {
-      fontSize: '11px', color: '#aabbcc',
-    }).setOrigin(0.5).setDepth(42)
-    const prev = this.add.rectangle(GAME_W - 102, y + 32, 34, 22, this.equipPage > 0 ? 0x223344 : 0x222233)
-      .setStrokeStyle(1, 0x667788)
-      .setInteractive({ useHandCursor: this.equipPage > 0 })
-      .setDepth(41)
-    const prevText = this.add.text(GAME_W - 102, y + 32, '<', {
-      fontSize: '12px', color: this.equipPage > 0 ? '#ffffff' : '#667788',
-    }).setOrigin(0.5).setDepth(42)
-    const next = this.add.rectangle(GAME_W - 22, y + 32, 34, 22, this.equipPage < pageCount - 1 ? 0x223344 : 0x222233)
-      .setStrokeStyle(1, 0x667788)
-      .setInteractive({ useHandCursor: this.equipPage < pageCount - 1 })
-      .setDepth(41)
-    const nextText = this.add.text(GAME_W - 22, y + 32, '>', {
-      fontSize: '12px', color: this.equipPage < pageCount - 1 ? '#ffffff' : '#667788',
-    }).setOrigin(0.5).setDepth(42)
-    if (this.equipPage > 0) prev.on('pointerdown', () => this.changeEquipPage(-1))
-    if (this.equipPage < pageCount - 1) next.on('pointerdown', () => this.changeEquipPage(1))
-    c.add([pageText, prev, prevText, next, nextText])
-
-    items.forEach((owned, i) => {
-      const weapon = WEAPONS[owned.weaponId]
-      if (!weapon) return
-      const iy = y + 56 + i * 16
-      const selected = owned.equippedCharId === charId
-      const equippedTo = owned.equippedCharId ? CHARACTERS[owned.equippedCharId]?.name ?? owned.equippedCharId : '未装備'
-      const rowBg = this.add.rectangle(GAME_W / 2, iy + 7, GAME_W - 82, 16, selected ? 0x263044 : 0x111a33)
-        .setStrokeStyle(1, selected ? 0xffffff : RARITY_COLORS[weapon.rarity])
-        .setInteractive({ useHandCursor: true })
-        .setDepth(41)
-      const rowText = this.add.text(48, iy, `${weapon.emoji} ${weapon.name} Lv.${owned.level}`, {
-        fontSize: '11px', color: '#ffffff',
-      }).setDepth(42)
-      const rowMeta = this.add.text(GAME_W - 52, iy, equippedTo, {
-        fontSize: '10px', color: owned.equippedCharId ? '#66ccff' : '#8899aa',
-      }).setDepth(42)
-      rowBg.on('pointerdown', () => this.equipWeaponToCharacter(owned.uid, charId))
-      c.add([rowBg, rowText, rowMeta])
+    slotItems.forEach((owned, i) => {
+      const y = viewTop + 44 + i * (cardH + gap)
+      this.createItemCard(list, owned, panelX, y, panelW, {
+        selected: owned.uid === current?.uid,
+        showEquippedTo: true,
+        onDragDelta: delta => applyScroll(scrollY + delta),
+        onClick: () => this.equipWeaponToCharacter(owned.uid, charId, slot),
+      })
     })
-  }
 
+    if (maxScroll > 0) {
+      c.add(this.add.text(panelX + panelW / 2 - 8, viewBottom - 4, 'v', {
+        fontSize: '12px', color: '#556680',
+      }).setOrigin(0.5).setDepth(46))
+    }
+  }
   private buildItemPanel(): Phaser.GameObjects.Container {
     const c = this.add.container(0, 0)
     this.save = this.loadSave()
-    c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 20, 'アイテム', {
+    const groupedCount = new Set(this.save.ownedWeapons.map(w => this.weaponStackKey(w))).size
+    c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 20, `アイテム  ${this.save.ownedWeapons.length}個 / ${groupedCount}種`, {
       fontSize: '17px', color: '#aaaacc',
     }).setOrigin(0.5))
     this.buildItemInventory(c)
-    this.buildSelectedWeaponPanel(c)
     return c
   }
 
   private buildItemInventory(c: Phaser.GameObjects.Container) {
-    const pageCount = Math.max(1, Math.ceil(this.save.ownedWeapons.length / ITEMS_PER_PAGE))
-    this.itemPage = Phaser.Math.Clamp(this.itemPage, 0, pageCount - 1)
-    const start = this.itemPage * ITEMS_PER_PAGE
-    const pageItems = this.save.ownedWeapons.slice(start, start + ITEMS_PER_PAGE)
-    const groupedCount = new Set(this.save.ownedWeapons.map(w => this.weaponStackKey(w))).size
-
-    c.add(this.add.text(28, CONTENT_TOP + 14, `所持アイテム ${this.itemPage + 1}/${pageCount}`, {
-      fontSize: '14px', color: '#aaaacc', fontStyle: 'bold',
-    }))
-    this.addPageButton(c, GAME_W - 104, CONTENT_TOP + 20, '<', this.itemPage > 0, () => this.changeItemPage(-1))
-    this.addPageButton(c, GAME_W - 44, CONTENT_TOP + 20, '>', this.itemPage < pageCount - 1, () => this.changeItemPage(1))
-    c.add(this.add.text(28, CONTENT_TOP + 36, `合計 ${this.save.ownedWeapons.length}個 / 強化別 ${groupedCount}種`, {
-      fontSize: '12px', color: '#88aacc',
-    }))
-
     if (this.save.ownedWeapons.length === 0) {
       c.add(this.add.text(GAME_W / 2, CONTENT_TOP + 230, 'アイテムはまだありません\n戦闘報酬で装備を入手できます。', {
         fontSize: '14px', color: '#667788', align: 'center',
@@ -494,218 +518,482 @@ export class HomeScene extends Phaser.Scene {
       return
     }
 
-    pageItems.forEach((owned, i) => {
-      const weapon = WEAPONS[owned.weaponId]
-      if (!weapon) return
-      const y = CONTENT_TOP + 52 + i * 30
-      const selected = owned.uid === this.selectedWeaponUid
-      const sameCount = this.ownedWeaponCount(owned)
-      const equippedTo = owned.equippedCharId ? CHARACTERS[owned.equippedCharId]?.name ?? owned.equippedCharId : '未装備'
-      const bg = this.add.rectangle(GAME_W / 2, y + 12, GAME_W - 36, 28, selected ? 0x263044 : 0x111a33)
-        .setStrokeStyle(1, selected ? 0xffffff : RARITY_COLORS[weapon.rarity])
-        .setInteractive({ useHandCursor: true })
-      const name = this.add.text(32, y + 2, `${weapon.emoji} ${weapon.name}`, {
-        fontSize: '14px', color: '#ffffff', fontStyle: selected ? 'bold' : '',
+    const list = this.add.container(0, 0)
+    c.add(list)
+    const viewTop = CONTENT_TOP + 10
+    const viewBottom = GAME_H - TAB_H - 8
+    const viewHeight = viewBottom - viewTop
+    const rowCount = Math.ceil(this.save.ownedWeapons.length / 2)
+    const contentHeight = rowCount * 80 + 10
+    const maxScroll = Math.max(0, contentHeight - viewHeight)
+    let scrollY = 0
+    const applyScroll = (next: number) => {
+      scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
+      list.y = -scrollY
+    }
+
+    const scrollHit = this.add.rectangle(GAME_W / 2, (viewTop + viewBottom) / 2, GAME_W, viewHeight, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: false })
+    c.add(scrollHit)
+    scrollHit.on('wheel', (_p: Phaser.Input.Pointer, _x: number, _y: number, dy: number) => applyScroll(scrollY + dy * 0.6))
+    let dragging = false
+    let lastY = 0
+    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = p.y })
+    scrollHit.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!dragging || !p.isDown) return
+      applyScroll(scrollY + (lastY - p.y))
+      lastY = p.y
+    })
+    scrollHit.on('pointerup', () => { dragging = false })
+    scrollHit.on('pointerout', () => { dragging = false })
+
+    this.save.ownedWeapons.forEach((owned, i) => {
+      const col = i % 2
+      const row = Math.floor(i / 2)
+      const cardW = (GAME_W - 54) / 2
+      const x = 20 + cardW / 2 + col * (cardW + 14)
+      const y = CONTENT_TOP + 16 + row * 80
+      this.createItemCard(list, owned, x, y, cardW)
+    })
+
+    if (maxScroll > 0) {
+      c.add(this.add.text(GAME_W - 24, viewBottom - 8, '▼', { fontSize: '14px', color: '#556680' }).setOrigin(0.5))
+    }
+  }
+
+  private createItemCard(
+    parent: Phaser.GameObjects.Container,
+    owned: OwnedWeapon,
+    x: number,
+    y: number,
+    cardW: number,
+    options: { selected?: boolean; showEquippedTo?: boolean; onClick?: () => void; onDragDelta?: (delta: number) => void } = {},
+  ) {
+    const weapon = WEAPONS[owned.weaponId]
+    if (!weapon) return
+    const slotColor = this.equipmentSlotColor(weapon.slot)
+    const objects = this.createInfoCard(parent, {
+      x, y, cardW,
+      icon: weapon.emoji,
+      name: this.equipmentDisplayName(weapon.name, owned.level),
+      description: weapon.description,
+      meta: weapon.rarity,
+      borderColor: slotColor,
+      iconColor: slotColor,
+      metaColor: this.rarityTextColor(weapon.rarity),
+      selected: options.selected,
+      onClick: options.onClick,
+      onDragDelta: options.onDragDelta,
+    })
+    if (options.showEquippedTo && owned.equippedCharId && !options.selected) {
+      const equippedTo = CHARACTERS[owned.equippedCharId]?.name ?? owned.equippedCharId
+      objects.push(this.add.text(x + cardW / 2 - 10, y + 56, equippedTo, {
+        fontSize: '11px', color: '#66ccff',
+      }).setOrigin(1, 0))
+      parent.add(objects[objects.length - 1])
+    }
+  }
+
+  private createInfoCard(
+    parent: Phaser.GameObjects.Container,
+    params: {
+      x: number
+      y: number
+      cardW: number
+      icon: string
+      name: string
+      description: string
+      meta: string
+      borderColor: number
+      iconColor: number
+      metaColor: string
+      selected?: boolean
+      onClick?: () => void
+      onDragDelta?: (delta: number) => void
+    },
+  ) {
+    const { x, y, cardW } = params
+    const cardH = 74
+    const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, params.selected ? 0x1e3150 : 0x111a33, 0.96)
+      .setStrokeStyle(1, params.selected ? 0xffdd66 : params.borderColor, params.selected ? 1 : 0.85)
+    if (params.onClick || params.onDragDelta) {
+      let downY = 0
+      let moved = 0
+      let pressed = false
+      bg.setInteractive({ useHandCursor: !!params.onClick })
+      bg.on('pointerdown', (p: Phaser.Input.Pointer) => {
+        downY = p.y
+        moved = 0
+        pressed = true
       })
-      const meta = this.add.text(GAME_W - 28, y + 4, `${weapon.rarity} Lv.${owned.level} x${sameCount} / ${equippedTo}`, {
-        fontSize: '12px', color: owned.equippedCharId ? '#66ccff' : '#8899aa',
-      }).setOrigin(1, 0)
-      bg.on('pointerdown', () => this.selectWeapon(owned.uid))
-      c.add([bg, name, meta])
+      bg.on('pointermove', (p: Phaser.Input.Pointer) => {
+        if (!pressed || !p.isDown || !params.onDragDelta) return
+        const delta = downY - p.y
+        moved += Math.abs(delta)
+        downY = p.y
+        params.onDragDelta(delta)
+      })
+      bg.on('pointerup', () => {
+        if (pressed && moved < 8) params.onClick?.()
+        pressed = false
+      })
+      bg.on('pointerout', () => { pressed = false })
+    }
+    const iconBg = this.add.circle(x - cardW / 2 + 28, y + 25, 18, params.iconColor, 0.24)
+    const icon = this.add.text(x - cardW / 2 + 28, y + 22, params.icon, { fontSize: '18px' }).setOrigin(0.5)
+    const name = this.add.text(x - cardW / 2 + 52, y + 10, params.name, {
+      fontSize: '14px', color: '#ffffff', fontStyle: params.selected ? 'bold' : '', wordWrap: { width: cardW - 64 },
+    })
+    const effect = this.add.text(x - cardW / 2 + 52, y + 31, params.description, {
+      fontSize: '12px', color: '#88aacc', wordWrap: { width: cardW - 64 },
+    })
+    const meta = this.add.text(x + cardW / 2 - 10, y + 10, params.meta, {
+      fontSize: '12px', color: params.metaColor, fontStyle: 'bold',
+    }).setOrigin(1, 0)
+    const objects: Phaser.GameObjects.GameObject[] = [bg, iconBg, icon, name, effect, meta]
+    parent.add(objects)
+    return objects
+  }
+
+  private bindPanelScroll(
+    owner: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    applyDelta: (delta: number) => void,
+  ) {
+    const contains = (p: Phaser.Input.Pointer) =>
+      p.x >= x - w / 2 && p.x <= x + w / 2 && p.y >= y - h / 2 && p.y <= y + h / 2
+    let dragging = false
+    let lastY = 0
+    const onWheel = (p: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
+      if (contains(p)) applyDelta(dy * 0.6)
+    }
+    const onDown = (p: Phaser.Input.Pointer) => {
+      if (!contains(p)) return
+      dragging = true
+      lastY = p.y
+    }
+    const onMove = (p: Phaser.Input.Pointer) => {
+      if (!dragging || !p.isDown) return
+      applyDelta(lastY - p.y)
+      lastY = p.y
+    }
+    const onUp = () => { dragging = false }
+    this.input.on('wheel', onWheel)
+    this.input.on('pointerdown', onDown)
+    this.input.on('pointermove', onMove)
+    this.input.on('pointerup', onUp)
+    owner.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.input.off('wheel', onWheel)
+      this.input.off('pointerdown', onDown)
+      this.input.off('pointermove', onMove)
+      this.input.off('pointerup', onUp)
     })
   }
 
-  private buildSelectedWeaponPanel(c: Phaser.GameObjects.Container) {
-    const owned = this.selectedWeaponUid ? this.save.ownedWeapons.find(w => w.uid === this.selectedWeaponUid) : null
-    const weapon = owned ? WEAPONS[owned.weaponId] : null
-    const y = CONTENT_TOP + 462
-
-    const bg = this.add.rectangle(GAME_W / 2, y + 58, GAME_W - 28, 116, 0x111a33)
-      .setStrokeStyle(1, weapon ? RARITY_COLORS[weapon.rarity] : 0x334466)
-    c.add(bg)
-    if (!owned || !weapon) {
-      c.add(this.add.text(GAME_W / 2, y + 58, 'アイテムを選択すると詳細が表示されます。', {
-        fontSize: '15px', color: '#667788',
-      }).setOrigin(0.5))
-      return
-    }
-
-    c.add(this.add.text(36, y + 8, `${weapon.emoji} ${weapon.name}  ${weapon.rarity} Lv.${owned.level}`, {
-      fontSize: '18px', color: '#ffffff', fontStyle: 'bold',
-    }))
-    c.add(this.add.text(36, y + 34, weapon.description, {
-      fontSize: '14px', color: '#88aacc',
-    }))
-    c.add(this.add.text(36, y + 58, this.weaponDeltaText(owned), {
-      fontSize: '14px', color: '#ffdd88',
-    }))
-
-    const cost = this.weaponUpgradeCost(owned.level)
-    const canUpgrade = this.save.credits >= cost && owned.level < 5
-    const upgradeBtn = this.add.rectangle(GAME_W - 80, y + 30, 128, 34, canUpgrade ? 0x225544 : 0x333344)
-      .setStrokeStyle(1, canUpgrade ? 0x44cc88 : 0x555566)
-      .setInteractive({ useHandCursor: canUpgrade })
-    const upgradeText = this.add.text(GAME_W - 80, y + 30, owned.level >= 5 ? 'Lv.MAX' : `${cost} 強化`, {
-      fontSize: '13px', color: canUpgrade ? '#ffffff' : '#777788',
-    }).setOrigin(0.5)
-    if (canUpgrade) upgradeBtn.on('pointerdown', () => this.upgradeSelectedWeapon())
-
-    const unequipBtn = this.add.rectangle(GAME_W - 80, y + 72, 128, 32, owned.equippedCharId ? 0x442222 : 0x222233)
-      .setStrokeStyle(1, owned.equippedCharId ? 0xaa5555 : 0x555566)
-      .setInteractive({ useHandCursor: !!owned.equippedCharId })
-    const unequipText = this.add.text(GAME_W - 80, y + 72, '外す', {
-      fontSize: '13px', color: owned.equippedCharId ? '#ffffff' : '#777788',
-    }).setOrigin(0.5)
-    if (owned.equippedCharId) unequipBtn.on('pointerdown', () => this.unequipSelectedWeapon())
-    c.add([upgradeBtn, upgradeText, unequipBtn, unequipText])
+  private equipmentSlotColor(slot: EquipmentSlot) {
+    if (slot === 'weapon') return 0xcc4455
+    if (slot === 'core') return 0xffcc44
+    if (slot === 'sensor') return 0x55aaff
+    return 0xe8edf5
   }
 
-  private weaponDeltaText(owned: OwnedWeapon) {
+  private rarityTextColor(rarity: string) {
+    if (rarity === 'N') return '#9aa4b2'
+    if (rarity === 'R') return '#ffffff'
+    if (rarity === 'SR') return '#ffdd66'
+    return '#ffcc44'
+  }
+
+  private sellPrice(owned: OwnedWeapon) {
     const weapon = WEAPONS[owned.weaponId]
-    if (!weapon) return ''
-    const levelBonus = 1 + owned.level * 0.1
-    const atk = Math.round((1 + (weapon.atkMult - 1) * levelBonus - 1) * 100)
-    const cooldown = Math.round((1 - (1 + (weapon.atkSpeedMult - 1) * levelBonus)) * 100)
-    const range = Math.round((1 + (weapon.rangeMult - 1) * levelBonus - 1) * 100)
-    const crit = Math.round(weapon.critChance * levelBonus * 100)
-    const parts = []
-    if (atk !== 0) parts.push(`攻撃 ${atk > 0 ? '+' : ''}${atk}%`)
-    if (cooldown !== 0) parts.push(`冷却 ${cooldown > 0 ? '-' : '+'}${Math.abs(cooldown)}%`)
-    if (range !== 0) parts.push(`射程 ${range > 0 ? '+' : ''}${range}%`)
-    if (crit !== 0) parts.push(`会心 +${crit}%`)
-    return parts.join(' / ') || '性能変化なし'
+    if (!weapon) return 0
+    const rarityBase = weapon.rarity === 'N' ? 10 : weapon.rarity === 'R' ? 100 : weapon.rarity === 'SR' ? 1000 : 5000
+    const slotMult = weapon.slot === 'core' ? 1.1 : weapon.slot === 'module' ? 0.9 : 1
+    return Math.max(1, Math.round(rarityBase * slotMult * (1 + owned.level * 0.25)))
   }
 
-  private weaponUpgradeCost(level: number) {
-    return 120 + level * 90
+  private equipmentStatBonus(charId: string) {
+    const result = { atkMult: 1, atkSpeedMult: 1, critAdd: 0 }
+    const equipmentBonus = 1 + this.save.upgrades.equipmentLevel * 0.03
+    for (const owned of this.save.ownedWeapons) {
+      if (owned.equippedCharId !== charId) continue
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon || !canEquipWeaponToCharacter(weapon, charId)) continue
+      const levelBonus = 1 + owned.level * 0.1
+      const bonus = levelBonus * equipmentBonus
+      if (weapon.atkMult !== 1) result.atkMult *= 1 + (weapon.atkMult - 1) * bonus
+      if (weapon.atkSpeedMult < 1) result.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
+      if (weapon.atkSpeedMult > 1) result.atkSpeedMult *= weapon.atkSpeedMult
+      if (weapon.critChance > 0) result.critAdd += weapon.critChance * bonus
+    }
+    return result
+  }
+
+  private formatSigned(value: number, digits: number) {
+    if (Math.abs(value) < 0.005) return ''
+    return value > 0 ? ` +${value.toFixed(digits)}` : ` -${Math.abs(value).toFixed(digits)}`
+  }
+
+  private equipmentDisplayName(name: string, level: number) {
+    return level > 0 ? `${name}+${level}` : name
   }
 
   private weaponStackKey(owned: OwnedWeapon) {
     return `${owned.weaponId}:lv${owned.level}`
   }
 
-  private ownedWeaponCount(owned: OwnedWeapon) {
-    const key = this.weaponStackKey(owned)
-    return this.save.ownedWeapons.filter(w => this.weaponStackKey(w) === key).length
+  private getEquippedBySlot(charId: string) {
+    const equipped = new Map<EquipmentSlot, OwnedWeapon>()
+    for (const owned of this.save.ownedWeapons) {
+      if (owned.equippedCharId !== charId) continue
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon) continue
+      equipped.set(weapon.slot, owned)
+    }
+    return equipped
   }
 
-  private selectWeapon(uid: string) {
-    this.selectedWeaponUid = uid
-    this.rebuildPanel(2, this.buildItemPanel())
-    this.panels[2].setVisible(true)
-  }
-
-  private changeItemPage(delta: number) {
-    this.itemPage += delta
-    this.rebuildPanel(2, this.buildItemPanel())
-    this.panels[2].setVisible(true)
-  }
-
-  private changeEquipPage(delta: number) {
-    this.equipPage += delta
-    this.rebuildPanel(1, this.buildCharPanel())
-    this.panels[1].setVisible(true)
-  }
-
-  private equipWeaponToCharacter(uid: string, charId: string) {
+  private equipWeaponToCharacter(uid: string, charId: string, slot: EquipmentSlot) {
     this.save = this.loadSave()
     const target = this.save.ownedWeapons.find(w => w.uid === uid)
     if (!target) return
+    const weapon = WEAPONS[target.weaponId]
+    if (!weapon || weapon.slot !== slot || !canEquipWeaponToCharacter(weapon, charId)) return
     for (const w of this.save.ownedWeapons) {
-      if (w.uid !== target.uid && w.equippedCharId === charId) w.equippedCharId = null
+      const otherWeapon = WEAPONS[w.weaponId]
+      if (w.uid !== target.uid && w.equippedCharId === charId && otherWeapon?.slot === slot) w.equippedCharId = null
     }
     target.equippedCharId = charId
     saveGame(this.save)
-    this.selectedWeaponUid = uid
+    this.refreshTopStatus()
     this.selectingEquipmentForCharId = null
     this.rebuildPanel(1, this.buildCharPanel())
     this.panels[1].setVisible(true)
   }
 
-  private unequipCharacterWeapon(charId: string) {
+  private unequipCharacterWeapon(charId: string, slot: EquipmentSlot) {
     this.save = this.loadSave()
-    const target = this.save.ownedWeapons.find(w => w.equippedCharId === charId)
+    const target = this.save.ownedWeapons.find(w => w.equippedCharId === charId && WEAPONS[w.weaponId]?.slot === slot)
     if (!target) return
     target.equippedCharId = null
     saveGame(this.save)
+    this.refreshTopStatus()
     this.selectingEquipmentForCharId = null
     this.rebuildPanel(1, this.buildCharPanel())
     this.panels[1].setVisible(true)
-  }
-
-  private unequipSelectedWeapon() {
-    if (!this.selectedWeaponUid) return
-    this.save = this.loadSave()
-    const target = this.save.ownedWeapons.find(w => w.uid === this.selectedWeaponUid)
-    if (!target) return
-    target.equippedCharId = null
-    saveGame(this.save)
-    this.rebuildPanel(2, this.buildItemPanel())
-    this.panels[2].setVisible(true)
-  }
-
-  private upgradeSelectedWeapon() {
-    if (!this.selectedWeaponUid) return
-    this.save = this.loadSave()
-    const target = this.save.ownedWeapons.find(w => w.uid === this.selectedWeaponUid)
-    if (!target || target.level >= 5) return
-    const cost = this.weaponUpgradeCost(target.level)
-    if (this.save.credits < cost) return
-    this.save.credits -= cost
-    target.level += 1
-    saveGame(this.save)
-    this.rebuildPanel(2, this.buildItemPanel())
-    this.panels[2].setVisible(true)
   }
 
   private buildShopPanel(): Phaser.GameObjects.Container {
     const c = this.add.container(0, 0)
     this.save = this.loadSave()
-    c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 22, `ショップ / 所持クレジット: ${this.save.credits}`, {
+    c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 22, this.shopMode === 'menu' ? '\u30b7\u30e7\u30c3\u30d7' : this.shopModeTitle(), {
       fontSize: '17px', color: '#aaaacc',
     }).setOrigin(0.5))
-    const side = this.addSideFrame(c, 0xaa8855)
-    const keeperIcon = this.add.text(GAME_W - 96, CONTENT_TOP + 78, '🛠', { fontSize: '46px' }).setOrigin(0.5)
-    const keeperName = this.add.text(GAME_W - 96, CONTENT_TOP + 126, '補給担当', {
-      fontSize: '16px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    const keeperLine = this.add.text(GAME_W - 96, CONTENT_TOP + 164, '防衛設備と研究を\nクレジットで整備します。', {
-      fontSize: '11px', color: '#9aa7bd', align: 'center',
-    }).setOrigin(0.5)
-    c.add([keeperIcon, keeperName, keeperLine])
-    keeperIcon.setPosition(side.x, side.y - 54).setFontSize(50)
-    keeperName.setPosition(side.x, side.y + 2)
-    keeperLine.setPosition(side.x, side.y + 48)
-
-    const items = [
-      { key: 'barricadeHpLevel' as keyof GameSave['upgrades'], title: 'バリケード補強', desc: '戦闘開始時のバリケード最大HP +5', value: (lv: number) => `現在 +${lv * 5} HP`, cost: (lv: number) => 140 + lv * 95 },
-      { key: 'equipmentLevel' as keyof GameSave['upgrades'], title: '装備整備', desc: '装備効果 +3%。装備を拾った後に効く投資。', value: (lv: number) => `現在 +${lv * 3}%`, cost: (lv: number) => 180 + lv * 120 },
-      { key: 'researchLevel' as keyof GameSave['upgrades'], title: '報酬研究', desc: '戦闘後クレジット +2%。周回効率を上げる。', value: (lv: number) => `現在 +${lv * 2}%`, cost: (lv: number) => 220 + lv * 150 },
-    ]
-    items.forEach((item, i) => {
-      const lv = Number(this.save.upgrades[item.key] ?? 0)
-      const cost = item.cost(lv)
-      const canBuy = this.save.credits >= cost
-      const y = CONTENT_TOP + 18 + i * 122
-      const bg = this.add.rectangle(156, y + 48, 260, 102, 0x111a33).setStrokeStyle(1, canBuy ? 0x44aa88 : 0x334466)
-      const title = this.add.text(42, y + 10, `${item.title}  Lv.${lv}`, { fontSize: '17px', color: '#ffffff', fontStyle: 'bold' })
-      const desc = this.add.text(42, y + 36, item.desc, { fontSize: '11px', color: '#8ea0bb', wordWrap: { width: 190 } })
-      const value = this.add.text(42, y + 68, item.value(lv), { fontSize: '12px', color: '#ffdd88' })
-      const btn = this.add.rectangle(260, y + 66, 92, 32, canBuy ? 0x225544 : 0x333344).setStrokeStyle(1, canBuy ? 0x44cc88 : 0x555566).setInteractive({ useHandCursor: canBuy })
-      const btnText = this.add.text(260, y + 66, `${cost}\n購入`, { fontSize: '10px', color: canBuy ? '#ffffff' : '#777788', align: 'center' }).setOrigin(0.5)
-      if (canBuy) btn.on('pointerdown', () => this.buyShopUpgrade(item.key, cost))
-      c.add([bg, title, desc, value, btn, btnText])
-    })
+    if (this.shopMode !== 'research') this.buildShopKeeper(c)
+    if (this.shopMode === 'menu') this.buildShopMenu(c)
+    else if (this.shopMode === 'sell') this.buildSellShop(c)
+    else if (this.shopMode === 'research') this.buildResearchShop(c)
+    else this.buildShopPlaceholder(c)
     return c
   }
 
+  private buildShopKeeper(c: Phaser.GameObjects.Container) {
+    const side = this.addSideFrame(c, 0xaa8855)
+    const keeperIcon = this.add.text(side.x, side.y - 54, '*', { fontSize: '50px', color: '#ffffff' }).setOrigin(0.5)
+    const keeperName = this.add.text(side.x, side.y + 2, '\u88dc\u7d66\u62c5\u5f53', {
+      fontSize: '16px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const keeperLine = this.add.text(side.x, side.y + 48, '\u88c5\u5099\u3068\u7814\u7a76\u3092\n\u30af\u30ec\u30b8\u30c3\u30c8\u3067\u6574\u5099\u3057\u307e\u3059\u3002', {
+      fontSize: '14px', color: '#9aa7bd', align: 'center', lineSpacing: 5,
+    }).setOrigin(0.5)
+    c.add([keeperIcon, keeperName, keeperLine])
+  }
+
+  private buildShopMenu(c: Phaser.GameObjects.Container) {
+    const modes: Array<{ mode: ShopMode; title: string; desc: string; icon: string }> = [
+      { mode: 'buy', title: '\u8cfc\u5165', desc: '\u30af\u30ec\u30b8\u30c3\u30c8\u3067\u88c5\u5099\u3092\u5165\u624b\u3059\u308b', icon: '>' },
+      { mode: 'sell', title: '\u58f2\u5374', desc: '\u672a\u88c5\u5099\u30a2\u30a4\u30c6\u30e0\u3092\u5b89\u304f\u58f2\u308b', icon: '>' },
+      { mode: 'upgrade', title: '\u88c5\u5099\u5f37\u5316', desc: '\u6240\u6301\u88c5\u5099\u3092+1\u5f37\u5316\u3059\u308b', icon: '>' },
+      { mode: 'research', title: '\u7814\u7a76', desc: '\u6052\u4e45\u30d1\u30c3\u30b7\u30d6\u5f37\u5316\u3092\u8cb7\u3046', icon: '>' },
+    ]
+    modes.forEach((item, i) => {
+      const y = CONTENT_TOP + 18 + i * 76
+      const bg = this.add.rectangle(160, y + 32, 270, 62, 0x111a33, 0.94)
+        .setStrokeStyle(1, 0x445a7a)
+        .setInteractive({ useHandCursor: true })
+      const icon = this.add.text(46, y + 30, item.icon, { fontSize: '16px', color: '#ffdd88' }).setOrigin(0.5)
+      const title = this.add.text(66, y + 12, item.title, { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' })
+      const desc = this.add.text(66, y + 38, item.desc, { fontSize: '14px', color: '#8ea0bb' })
+      bg.on('pointerdown', () => {
+        this.shopMode = item.mode
+        this.rebuildPanel(3, this.buildShopPanel())
+        this.panels[3].setVisible(true)
+      })
+      c.add([bg, icon, title, desc])
+    })
+  }
+
+  private buildShopBackButton(c: Phaser.GameObjects.Container) {
+    const back = this.add.text(34, CONTENT_TOP - 23, '< \u623b\u308b', {
+      fontSize: '15px', color: '#aab8cc', fontStyle: 'bold',
+    }).setInteractive({ useHandCursor: true })
+    back.on('pointerdown', () => {
+      this.shopMode = 'menu'
+      this.rebuildPanel(3, this.buildShopPanel())
+      this.panels[3].setVisible(true)
+    })
+    c.add(back)
+  }
+
+  private buildShopPlaceholder(c: Phaser.GameObjects.Container) {
+    this.buildShopBackButton(c)
+    c.add(this.add.text(160, CONTENT_TOP + 120, '\u3053\u306e\u9805\u76ee\u306f\u6b21\u306b\u5b9f\u88c5\u3057\u307e\u3059\u3002', {
+      fontSize: '16px', color: '#8ea0bb', align: 'center',
+    }).setOrigin(0.5))
+  }
+
+  private buildSellShop(c: Phaser.GameObjects.Container) {
+    this.buildShopBackButton(c)
+    const items = this.save.ownedWeapons.filter(w => !w.equippedCharId && WEAPONS[w.weaponId])
+    if (items.length === 0) {
+      c.add(this.add.text(160, CONTENT_TOP + 120, '\u58f2\u5374\u3067\u304d\u308b\u30a2\u30a4\u30c6\u30e0\u306f\u3042\u308a\u307e\u305b\u3093\u3002', {
+        fontSize: '15px', color: '#8ea0bb', align: 'center',
+      }).setOrigin(0.5))
+      return
+    }
+
+    const list = this.add.container(0, 0)
+    c.add(list)
+    const cardW = 270
+    const cardH = 74
+    const gap = 8
+    const viewTop = CONTENT_TOP + 14
+    const viewBottom = GAME_H - TAB_H - 10
+    const viewHeight = viewBottom - viewTop
+    const contentHeight = items.length * (cardH + gap) + 8
+    const maxScroll = Math.max(0, contentHeight - viewHeight)
+    let scrollY = 0
+    const applyScroll = (next: number) => {
+      scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
+      list.y = -scrollY
+    }
+
+    const maskShape = this.add.rectangle(160, (viewTop + viewBottom) / 2, cardW + 12, viewHeight, 0xffffff)
+    maskShape.setVisible(false)
+    list.setMask(maskShape.createGeometryMask())
+    c.add(maskShape)
+    this.bindPanelScroll(c, 160, (viewTop + viewBottom) / 2, cardW + 12, viewHeight, delta => applyScroll(scrollY + delta))
+
+    items.forEach((owned, i) => {
+      const y = viewTop + i * (cardH + gap)
+      const price = this.sellPrice(owned)
+      this.createItemCard(list, owned, 160, y, cardW, {
+        onDragDelta: delta => applyScroll(scrollY + delta),
+        onClick: () => this.showSellConfirm(owned.uid),
+      })
+      const priceText = this.add.text(160 + cardW / 2 - 10, y + cardH - 18, `${price} CREDIT`, {
+        fontSize: '12px', color: '#ffdd88', fontStyle: 'bold',
+      }).setOrigin(1, 0)
+      list.add(priceText)
+    })
+
+    if (maxScroll > 0) {
+      c.add(this.add.text(286, viewBottom - 8, 'v', { fontSize: '14px', color: '#556680' }).setOrigin(0.5))
+    }
+  }
+
+  private buildResearchShop(c: Phaser.GameObjects.Container) {
+    this.buildShopBackButton(c)
+    const cardW = (GAME_W - 54) / 2
+    RESEARCH_ITEMS.forEach((item, i) => {
+      const col = i % 2
+      const row = Math.floor(i / 2)
+      const x = 20 + cardW / 2 + col * (cardW + 14)
+      const y = CONTENT_TOP + 16 + row * 84
+      this.createResearchCard(c, item, x, y, cardW)
+    })
+  }
+
+  private createResearchCard(parent: Phaser.GameObjects.Container, item: ResearchItem, x: number, y: number, cardW: number) {
+    const level = Number(this.save.upgrades[item.id] ?? 0)
+    const maxed = level >= item.maxLevel
+    const cost = item.cost(level)
+    const canBuy = !maxed && this.save.credits >= cost
+    const meta = maxed ? 'MAX' : 'Lv.' + level + '/' + item.maxLevel
+    this.createInfoCard(parent, {
+      x, y, cardW,
+      icon: item.icon,
+      name: item.name,
+      description: item.valueText(level) + ' / ' + (maxed ? '強化済み' : item.nextText(level)),
+      meta,
+      borderColor: canBuy ? 0x44aa88 : 0x445a7a,
+      iconColor: 0x44aa88,
+      metaColor: maxed ? '#ffdd66' : '#ffffff',
+      selected: false,
+      onClick: canBuy ? () => this.showResearchConfirm(item, level, cost) : undefined,
+    })
+    if (!maxed) {
+      const price = this.add.text(x + cardW / 2 - 10, y + 56, cost + ' CREDIT', {
+        fontSize: '11px', color: canBuy ? '#ffdd88' : '#777788', fontStyle: 'bold',
+      }).setOrigin(1, 0)
+      parent.add(price)
+    }
+  }
+
+  private showResearchConfirm(item: ResearchItem, level: number, cost: number) {
+    this.showConfirmDialog(
+      `${item.name}\nLv.${level} -> Lv.${level + 1}\n${item.nextText(level)}\n${cost} CREDIT で研究します。\nよろしいですか？`,
+      () => this.buyResearchUpgrade(item.id, cost),
+    )
+  }
+
+  private shopModeTitle() {
+    if (this.shopMode === 'buy') return '\u30b7\u30e7\u30c3\u30d7 / \u8cfc\u5165'
+    if (this.shopMode === 'sell') return '\u30b7\u30e7\u30c3\u30d7 / \u58f2\u5374'
+    if (this.shopMode === 'upgrade') return '\u30b7\u30e7\u30c3\u30d7 / \u88c5\u5099\u5f37\u5316'
+    return '\u30b7\u30e7\u30c3\u30d7 / \u7814\u7a76'
+  }
   private buildFilePanel(): Phaser.GameObjects.Container {
     const c = this.add.container(0, 0)
     c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 20, '敵ファイル', {
       fontSize: '17px', color: '#aaaacc',
     }).setOrigin(0.5))
 
-    Object.values(ENEMIES).forEach((enemy, i) => {
+    const list = this.add.container(0, 0)
+    c.add(list)
+
+    const viewTop = CONTENT_TOP + 8
+    const viewBottom = GAME_H - TAB_H - 8
+    const viewHeight = viewBottom - viewTop
+    const enemyList = Object.values(ENEMIES)
+    const rowCount = Math.ceil(enemyList.length / 2)
+    const contentHeight = rowCount * 62 + 10
+    const maxScroll = Math.max(0, contentHeight - viewHeight)
+    let scrollY = 0
+    const applyScroll = (next: number) => {
+      scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
+      list.y = -scrollY
+    }
+
+    const scrollHit = this.add.rectangle(GAME_W / 2, (viewTop + viewBottom) / 2, GAME_W, viewHeight, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: false })
+    c.add(scrollHit)
+    scrollHit.on('wheel', (_p: Phaser.Input.Pointer, _x: number, _y: number, dy: number) => applyScroll(scrollY + dy * 0.6))
+    let dragging = false
+    let lastY = 0
+    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = p.y })
+    scrollHit.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!dragging || !p.isDown) return
+      applyScroll(scrollY + (lastY - p.y))
+      lastY = p.y
+    })
+    scrollHit.on('pointerup', () => { dragging = false })
+    scrollHit.on('pointerout', () => { dragging = false })
+
+    enemyList.forEach((enemy, i) => {
       const col = i % 2
       const row = Math.floor(i / 2)
       const cardW = (GAME_W - 54) / 2
@@ -716,10 +1004,15 @@ export class HomeScene extends Phaser.Scene {
       const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, 0x111a33).setStrokeStyle(1, color, 0.75)
       const iconBg = this.add.circle(x - cardW / 2 + 28, y + 22, 18, color, 0.3)
       const icon = this.add.text(x - cardW / 2 + 28, y + 19, enemy.emoji, { fontSize: '20px' }).setOrigin(0.5)
-      const name = this.add.text(x - cardW / 2 + 52, y + 8, enemy.name, { fontSize: '13px', color: '#ffffff', fontStyle: 'bold' })
-      const stats = this.add.text(x - cardW / 2 + 52, y + 27, `HP ${enemy.hp} / SPD ${enemy.speed}`, { fontSize: '10px', color: '#88aacc' })
-      c.add([bg, iconBg, icon, name, stats])
+      const name = this.add.text(x - cardW / 2 + 52, y + 8, enemy.name, { fontSize: '15px', color: '#ffffff', fontStyle: 'bold' })
+      const stats = this.add.text(x - cardW / 2 + 52, y + 27, `HP ${enemy.hp} / SPD ${enemy.speed}`, { fontSize: '15px', color: '#88aacc' })
+      list.add([bg, iconBg, icon, name, stats])
     })
+
+    if (maxScroll > 0) {
+      c.add(this.add.text(GAME_W - 24, viewBottom - 8, '▼', { fontSize: '14px', color: '#556680' }).setOrigin(0.5))
+    }
+
     return c
   }
 
@@ -732,16 +1025,84 @@ export class HomeScene extends Phaser.Scene {
     this.save.credits -= cost
     this.save.upgrades[key] = current + 1
     saveGame(this.save)
+    this.refreshTopStatus()
     this.rebuildPanel(1, this.buildCharPanel())
     this.panels[1].setVisible(true)
   }
 
-  private buyShopUpgrade(key: keyof GameSave['upgrades'], cost: number) {
+  private buyResearchUpgrade(key: keyof GameSave['upgrades'], cost: number) {
     this.save = this.loadSave()
     if (this.save.credits < cost) return
+    const item = RESEARCH_ITEMS.find(r => r.id === key)
+    const current = Number(this.save.upgrades[key] ?? 0)
+    if (!item || current >= item.maxLevel) return
     this.save.credits -= cost
-    this.save.upgrades[key] = Number(this.save.upgrades[key] ?? 0) + 1
+    this.save.upgrades[key] = current + 1
     saveGame(this.save)
+    this.refreshTopStatus()
+    this.rebuildPanel(3, this.buildShopPanel())
+    this.panels[3].setVisible(true)
+  }
+
+  private showSellConfirm(uid: string) {
+    this.save = this.loadSave()
+    const target = this.save.ownedWeapons.find(w => w.uid === uid)
+    const weapon = target ? WEAPONS[target.weaponId] : null
+    if (!target || !weapon || target.equippedCharId) return
+    const price = this.sellPrice(target)
+    this.showConfirmDialog(
+      `${this.equipmentDisplayName(weapon.name, target.level)}\n${price} CREDIT で売却します。`,
+      () => this.sellOwnedWeapon(uid),
+    )
+  }
+
+  private showConfirmDialog(message: string, onYes: () => void) {
+    const overlay = this.add.container(0, 0).setDepth(200)
+    const veil = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.58)
+      .setInteractive({ useHandCursor: false })
+    const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, 340, 176, 0x111a33, 0.98)
+      .setStrokeStyle(2, 0x88aacc)
+    const msg = this.add.text(GAME_W / 2, GAME_H / 2 - 42, message, {
+      fontSize: '16px', color: '#ffffff', align: 'center', lineSpacing: 8,
+    }).setOrigin(0.5)
+    const yes = this.add.rectangle(GAME_W / 2 - 70, GAME_H / 2 + 48, 110, 38, 0x225544)
+      .setStrokeStyle(1, 0x44cc88)
+      .setInteractive({ useHandCursor: true })
+    const no = this.add.rectangle(GAME_W / 2 + 70, GAME_H / 2 + 48, 110, 38, 0x333344)
+      .setStrokeStyle(1, 0x667788)
+      .setInteractive({ useHandCursor: true })
+    const yesText = this.add.text(GAME_W / 2 - 70, GAME_H / 2 + 48, 'はい', {
+      fontSize: '16px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const noText = this.add.text(GAME_W / 2 + 70, GAME_H / 2 + 48, 'いいえ', {
+      fontSize: '16px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const stop = (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => event.stopPropagation()
+    veil.on('pointerdown', stop)
+    veil.on('pointerup', stop)
+    yes.on('pointerdown', stop)
+    yes.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
+      overlay.destroy()
+      onYes()
+    })
+    no.on('pointerdown', stop)
+    no.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
+      overlay.destroy()
+    })
+    overlay.add([veil, bg, msg, yes, no, yesText, noText])
+  }
+
+  private sellOwnedWeapon(uid: string) {
+    this.save = this.loadSave()
+    const target = this.save.ownedWeapons.find(w => w.uid === uid)
+    if (!target || target.equippedCharId) return
+    const price = this.sellPrice(target)
+    this.save.ownedWeapons = this.save.ownedWeapons.filter(w => w.uid !== uid)
+    this.save.credits += price
+    saveGame(this.save)
+    this.refreshTopStatus()
     this.rebuildPanel(3, this.buildShopPanel())
     this.panels[3].setVisible(true)
   }

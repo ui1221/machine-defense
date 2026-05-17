@@ -98,8 +98,12 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   knockback(dist: number) {
-    this.y = Math.max(BARRICADE_Y - 600, this.y - dist)
-    if (this.atBarricade) {
+    const resist = Phaser.Math.Clamp(this.config.knockbackResist ?? 0, 0, 1)
+    const actualDist = Math.max(0, dist * (1 - resist))
+    if (actualDist <= 0.1) return
+
+    this.y = Math.max(BARRICADE_Y - 600, this.y - actualDist)
+    if (this.atBarricade && this.y < BARRICADE_Y - 21) {
       this.atBarricade = false
       this.nextAttackReadyTime = 0
       this.attackWarningShown = false

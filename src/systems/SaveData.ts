@@ -1,5 +1,5 @@
 import type { GameSave, OwnedWeapon, PermanentUpgrades } from '../types'
-import { WEAPONS } from '../data/weapons'
+import { canEquipWeaponToCharacter, WEAPONS } from '../data/weapons'
 
 export const SAVE_KEY = 'td_save'
 const RETIRED_CHARACTER_IDS = new Set(['rapid'])
@@ -24,6 +24,12 @@ export const DEFAULT_UPGRADES: PermanentUpgrades = {
   barricadeHpLevel: 0,
   equipmentLevel: 0,
   researchLevel: 0,
+  researchExpLevel: 0,
+  researchAtkLevel: 0,
+  researchCooldownLevel: 0,
+  researchRangeLevel: 0,
+  researchProjectileLevel: 0,
+  researchBarricadeLevel: 0,
 }
 
 export function loadSave(): GameSave {
@@ -93,10 +99,16 @@ export function upgradeCost(level: number) {
 
 function normalizeOwnedWeapon(raw: Partial<OwnedWeapon>): OwnedWeapon {
   const weaponId = typeof raw.weaponId === 'string' ? raw.weaponId : ''
+  const equippedCharId = typeof raw.equippedCharId === 'string'
+    && !RETIRED_CHARACTER_IDS.has(raw.equippedCharId)
+    && WEAPONS[weaponId]
+    && canEquipWeaponToCharacter(WEAPONS[weaponId], raw.equippedCharId)
+    ? raw.equippedCharId
+    : null
   return {
     uid: typeof raw.uid === 'string' ? raw.uid : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     weaponId,
-    equippedCharId: typeof raw.equippedCharId === 'string' && !RETIRED_CHARACTER_IDS.has(raw.equippedCharId) ? raw.equippedCharId : null,
+    equippedCharId,
     level: typeof raw.level === 'number' ? raw.level : 0,
     rarity: raw.rarity ?? WEAPONS[weaponId]?.rarity,
   }

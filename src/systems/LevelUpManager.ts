@@ -5,6 +5,7 @@ import type { BattleState, UpgradeOption } from '../types'
 export class LevelUpManager {
   exp = 0
   level = 0
+  pendingLevelUps = 0
   private acquiredUpgrades = new Map<string, number>()
 
   get requiredExp() {
@@ -16,12 +17,18 @@ export class LevelUpManager {
 
   addExp(amount: number): boolean {
     this.exp += amount
-    if (this.exp >= this.requiredExp) {
+    while (this.exp >= this.requiredExp) {
       this.exp -= this.requiredExp
       this.level++
-      return true
+      this.pendingLevelUps++
     }
-    return false
+    return this.pendingLevelUps > 0
+  }
+
+  consumePendingLevelUp(): boolean {
+    if (this.pendingLevelUps <= 0) return false
+    this.pendingLevelUps--
+    return true
   }
 
   getExpRatio(): number {

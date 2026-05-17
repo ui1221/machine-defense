@@ -40,7 +40,7 @@ export class BattleUIScene extends Phaser.Scene {
       .setDepth(102)
     this.expBar.scaleX = 0
     this.add.text(GAME_W / 2, 35, 'EXP', {
-      fontSize: '9px', color: '#d8e8ff',
+      fontSize: '15px', color: '#d8e8ff',
     }).setOrigin(0.5).setDepth(103)
 
     // 操作系は右上に寄せ、戦場中央から外す。
@@ -56,7 +56,7 @@ export class BattleUIScene extends Phaser.Scene {
 
     // バリケード耐久は設備本体の右端へ寄せる。
     this.hpText = this.add.text(GAME_W - 26, BARRICADE_Y + 33, '', {
-      fontSize: '12px', color: '#ffeecc', fontStyle: 'bold',
+      fontSize: '14px', color: '#ffeecc', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setDepth(105)
 
@@ -128,7 +128,7 @@ export class BattleUIScene extends Phaser.Scene {
         fontSize: '18px', color: '#ffffff', fontStyle: 'bold',
       })
       const desc = this.add.text(-120, cy + 12, opt.description, {
-        fontSize: '13px', color: '#8899aa',
+        fontSize: '15px', color: '#8899aa',
       })
 
       card.on('pointerdown', () => {
