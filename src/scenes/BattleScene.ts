@@ -750,6 +750,10 @@ export class BattleScene extends Phaser.Scene {
     const critGrowth = ch.config.upgradeCritGrowth ?? 0.001
     if (atkLevel > 0) ch.atkMult *= 1 + atkLevel * atkGrowthRate
     if (atkLevel > 0) ch.critChance = Math.min(0.65, ch.critChance + atkLevel * critGrowth)
+    if (ch.config.id === 'assault') {
+      if (atkLevel >= 5) ch.burstCount += 1
+      if (atkLevel >= 12) ch.burstCount += 1
+    }
     const cooldownBonusSteps = Math.floor(atkLevel / 10)
     if (cooldownBonusSteps > 0) {
       const cooldownReduction = Math.min(0.08, cooldownBonusSteps * 0.005)

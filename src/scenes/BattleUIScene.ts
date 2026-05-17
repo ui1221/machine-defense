@@ -23,9 +23,6 @@ export class BattleUIScene extends Phaser.Scene {
 
   create() {
     // 上段HUD。中央の戦場面積を守るため、情報は最上部に押し込む。
-    this.add.rectangle(GAME_W / 2, 25, GAME_W, 50, 0x05070d, 0.78).setDepth(100)
-    this.add.rectangle(GAME_W / 2, 49, GAME_W - 18, 1, 0x41506d, 0.7).setDepth(101)
-
     this.levelText = this.add.text(12, 7, 'Lv.0', {
       fontSize: '16px', color: '#ffdd44', fontStyle: 'bold',
     }).setDepth(101)

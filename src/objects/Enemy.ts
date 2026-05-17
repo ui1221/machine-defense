@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { EnemyConfig } from '../types'
-import { BARRICADE_Y } from '../constants'
+import { BARRICADE_Y, SPAWN_Y } from '../constants'
 
 const ATTACK_DELAY = 1600
 const ATTACK_COOLDOWN = 3600
@@ -102,7 +102,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     const actualDist = Math.max(0, dist * (1 - resist))
     if (actualDist <= 0.1) return
 
-    this.y = Math.max(BARRICADE_Y - 600, this.y - actualDist)
+    this.y = Math.max(SPAWN_Y, this.y - actualDist)
     if (this.atBarricade && this.y < BARRICADE_Y - 21) {
       this.atBarricade = false
       this.nextAttackReadyTime = 0
