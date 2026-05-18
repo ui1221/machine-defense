@@ -50,7 +50,7 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
     description: '狭い範囲を高威力で斬る。ノックバック付きで、クールタイムは長い。',
     attackType: 'slash',
     atk: 6,
-    atkSpeed: 4200,
+    atkSpeed: 4700,
     range: 450,
     bulletSpeed: 0,
     baseCritChance: 0.25,

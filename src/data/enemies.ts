@@ -122,6 +122,6 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     description: '区画を制圧するための大型機。遅いが、非常に高い耐久と強い攻撃を持つ。',
     hp: 500, speed: 4, damage: 30, expReward: 80, size: 42, color: 0xff8844,
     abilities: ['warning_attack', 'boss'],
-    knockbackResist: 0.88,
+    knockbackResist: 0.95,
   },
 }

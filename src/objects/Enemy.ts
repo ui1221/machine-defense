@@ -179,6 +179,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   stun(until: number) {
+    if (this.hasAbility('boss')) return
     this.stunnedUntil = Math.max(this.stunnedUntil, until)
     this.bodyCircle.setFillStyle(0x99ddff, 0.55)
     this.scene.time.delayedCall(Math.max(0, until - ((this.scene as { elapsedMs?: number }).elapsedMs ?? 0)), () => {
@@ -187,6 +188,11 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   slow(until: number, factor: number) {
+    if (this.hasAbility('boss')) {
+      const now = (this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now
+      until = now + Math.max(0, until - now) * 0.35
+      factor = Math.max(factor, 0.88)
+    }
     this.slowedUntil = Math.max(this.slowedUntil, until)
     this.persistentSlowFactor = Math.min(this.persistentSlowFactor, factor)
     this.bodyCircle.setStrokeStyle(2, 0x66ddff, 0.8)

@@ -23,8 +23,10 @@ import { loadSave } from '../systems/SaveData'
 import type { StageConfig, BattleState, GameSave, CharacterDamageStat } from '../types'
 
 const ZONE_RADIUS = 62
-const FIELD_ZONE_DAMAGE_MULT = 0.75
+const FIELD_ZONE_DAMAGE_MULT = 0.68
 const BEAM_ZONE_DAMAGE_MULT = 0.48
+const BEAM_SLOW_DURATION = 420
+const BEAM_SLOW_FACTOR = 0.9
 const CRIT_MULT = 2.5
 const RAILGUN_KNOCKBACK_DIST = 80
 const ORB_KNOCKBACK_DIST = 8
@@ -174,6 +176,7 @@ export class BattleScene extends Phaser.Scene {
       if (!beam.shouldTick) continue
       for (const e of enemyList) {
         if (!e.active || !beam.containsEnemy(e)) continue
+        e.slow(now + BEAM_SLOW_DURATION, BEAM_SLOW_FACTOR)
         const rolled = this.rollCharacterDamage(beam.ownerId, beam.damagePerTick)
         const dead = e.takeDamage(rolled.damage)
         this.recordCharacterDamage(beam.ownerId, e.lastDamageTaken)
@@ -396,9 +399,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private readonly SLASH_RADIUS = 100
-  private readonly KNOCKBACK_DIST = 52
+  private readonly KNOCKBACK_DIST = 26
   private readonly SLASH_DAMAGE_MULT = 0.82
-  private readonly SLASH_SLOW_DURATION = 900
+  private readonly SLASH_SLOW_DURATION = 1400
   private readonly SLASH_SLOW_FACTOR = 0.72
 
   private doSlash(ch: Character, tx: number, ty: number, enemies: Enemy[]) {
