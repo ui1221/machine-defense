@@ -64,8 +64,8 @@ export class ResultScene extends Phaser.Scene {
     this.add.rectangle(portraitX, portraitY, SIDE_FRAME_W, SIDE_FRAME_H, SIDE_FRAME_FILL)
       .setStrokeStyle(2, accent)
     this.add.rectangle(portraitX, portraitY - SIDE_FRAME_H / 2 + 2, SIDE_FRAME_W - 12, 3, accent, 0.75)
-    this.add.image(portraitX, portraitY + 102, 'home_portrait')
-      .setScale(0.34)
+    this.add.image(portraitX, portraitY + 108, 'home_portrait')
+      .setScale(0.24)
     this.add.text(portraitX, portraitY + 82, 'アサルト型', {
       fontSize: '16px',
       color: '#ffffff',

@@ -50,6 +50,7 @@ export class HomeScene extends Phaser.Scene {
     this.selectingEquipmentSlot = null
     this.shopMode = 'menu'
 
+    this.buildBaseBackground()
     this.buildTopStatus()
     const tabBand = this.add.rectangle(GAME_W / 2, GAME_H - TAB_H / 2, GAME_W, TAB_H, 0x0a0a1a).setDepth(10)
     this.shellObjects.push(tabBand)
@@ -136,6 +137,15 @@ export class HomeScene extends Phaser.Scene {
     if (this.creditText) this.creditText.setText(`${this.loadSave().credits}`)
   }
 
+  private buildBaseBackground() {
+    const bg = this.add.image(GAME_W / 2, GAME_H / 2, 'home_base_bg').setOrigin(0.5).setDepth(-20)
+    const src = bg.texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement
+    const scale = Math.max(GAME_W / src.width, GAME_H / src.height)
+    bg.setScale(scale)
+    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x08101d, 0.42).setDepth(-19)
+    this.add.rectangle(GAME_W / 2, GAME_H - 150, GAME_W, 300, 0x030712, 0.28).setDepth(-18)
+  }
+
   private buildHubHome() {
     this.shellObjects.forEach(obj => obj.setVisible(false))
     this.backButtonContainer = this.createBackButton()
@@ -143,7 +153,6 @@ export class HomeScene extends Phaser.Scene {
 
     const c = this.add.container(0, 0)
     this.hubHomeContainer = c
-    const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x121826)
     const tint = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x09101d, 0.28)
     const roomTitle = this.add.text(28, 142, '拠点背景差し替え予定', {
       fontSize: '16px', color: '#d7e3f4', fontStyle: 'bold',
@@ -151,15 +160,15 @@ export class HomeScene extends Phaser.Scene {
     const roomNote = this.add.text(28, 170, '背景全面に室内ビジュアルを配置する想定', {
       fontSize: '14px', color: '#8292aa',
     })
-    const portraitShade = this.add.rectangle(GAME_W - 92, 404, 232, 720, 0x09101a, 0.18)
-    const portrait = this.add.image(GAME_W - 76, 632, 'home_portrait').setOrigin(0.5).setScale(0.78)
-    const portraitName = this.add.text(GAME_W - 100, 642, 'アサルト型', {
+    const portraitShade = this.add.rectangle(GAME_W - 118, 426, 246, 690, 0x09101a, 0.16)
+    const portrait = this.add.image(GAME_W - 118, 654, 'home_portrait').setOrigin(0.5).setScale(0.56)
+    const portraitName = this.add.text(GAME_W - 124, 642, 'アサルト型', {
       fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
-    const portraitNote = this.add.text(GAME_W - 100, 668, '立ち絵仮置き', {
+    const portraitNote = this.add.text(GAME_W - 124, 668, '立ち絵仮置き', {
       fontSize: '15px', color: '#8292aa',
     }).setOrigin(0.5)
-    c.add([bg, tint, roomTitle, roomNote, portraitShade, portrait, portraitName, portraitNote])
+    c.add([tint, roomTitle, roomNote, portraitShade, portrait, portraitName, portraitNote])
     this.shellObjects.forEach(obj => obj.setVisible(true))
   }
 

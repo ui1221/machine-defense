@@ -76,8 +76,7 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     // 背景は後から画像に差し替えやすいよう、戦場・防衛帯・足元で分けておく。
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x10121c).setDepth(0)
-    this.add.rectangle(GAME_W / 2, (BARRICADE_Y - 34) / 2, GAME_W, BARRICADE_Y - 34, 0x141726).setDepth(0)
+    this.buildBattleBackground()
     this.add.rectangle(GAME_W / 2, BARRICADE_Y - 42, GAME_W - 28, 4, 0x293149, 0.9).setDepth(1)
     this.add.rectangle(GAME_W / 2, BARRICADE_Y + 74, GAME_W, 150, 0x181b29, 0.95).setDepth(0)
     this.add.rectangle(GAME_W / 2, BARRICADE_Y + 24, GAME_W - 24, 118, 0x202538, 0.34)
@@ -100,6 +99,21 @@ export class BattleScene extends Phaser.Scene {
 
     this.addCharacter(this.stage.startingCharacter)
     this.scene.launch('BattleUIScene', { battle: this })
+  }
+
+  private buildBattleBackground() {
+    const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
+    if (stageNo <= 4) {
+      const bg = this.add.image(GAME_W / 2, GAME_H / 2, 'stage_forest_bg').setOrigin(0.5).setDepth(-10)
+      const src = bg.texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement
+      bg.setScale(Math.max(GAME_W / src.width, GAME_H / src.height))
+      this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x071018, 0.34).setDepth(-9)
+      this.add.rectangle(GAME_W / 2, BARRICADE_Y + 42, GAME_W, 190, 0x06101b, 0.3).setDepth(-8)
+      return
+    }
+
+    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x10121c).setDepth(0)
+    this.add.rectangle(GAME_W / 2, (BARRICADE_Y - 34) / 2, GAME_W, BARRICADE_Y - 34, 0x141726).setDepth(0)
   }
 
   addCharacter(charId: string) {

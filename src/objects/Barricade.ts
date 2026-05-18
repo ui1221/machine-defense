@@ -1,21 +1,28 @@
 import Phaser from 'phaser'
-import { GAME_W, BARRICADE_Y, BARRICADE_H } from '../constants'
+import { GAME_W, BARRICADE_Y } from '../constants'
 
 export class Barricade {
   hp: number
   maxHp: number
   private bar: Phaser.GameObjects.Rectangle
-  private body: Phaser.GameObjects.Rectangle
+  private body: Phaser.GameObjects.Image
+  private damagedBody: Phaser.GameObjects.Image
 
   constructor(scene: Phaser.Scene, maxHp: number) {
     this.hp = maxHp
     this.maxHp = maxHp
 
-    scene.add.rectangle(GAME_W / 2, BARRICADE_Y - 8, GAME_W - 28, 10, 0x3b445f, 0.95)
+    scene.add.rectangle(GAME_W / 2, BARRICADE_Y - 8, GAME_W - 28, 10, 0x1d2636, 0.72)
       .setDepth(2)
-    this.body = scene.add.rectangle(GAME_W / 2, BARRICADE_Y, GAME_W - 18, BARRICADE_H + 8, 0x92704a)
-      .setStrokeStyle(2, 0x2b2117)
+    this.body = scene.add.image(GAME_W / 2, BARRICADE_Y - 24, 'barricade_full')
+      .setOrigin(0.5)
+      .setDisplaySize(GAME_W + 38, 148)
       .setDepth(3)
+    this.damagedBody = scene.add.image(GAME_W / 2, BARRICADE_Y - 24, 'barricade_damaged')
+      .setOrigin(0.5)
+      .setDisplaySize(GAME_W + 38, 148)
+      .setDepth(3)
+      .setVisible(false)
 
     scene.add.rectangle(GAME_W / 2, BARRICADE_Y + 18, GAME_W - 56, 8, 0x232733)
       .setDepth(4)
@@ -30,10 +37,15 @@ export class Barricade {
 
     scene.tweens.add({
       targets: this.body,
-      fillColor: 0xff2222,
+      alpha: 0.45,
       duration: 80,
       yoyo: true,
-      onYoyo: () => this.body.setFillStyle(0x886644),
+    })
+    scene.tweens.add({
+      targets: this.damagedBody,
+      alpha: 0.45,
+      duration: 80,
+      yoyo: true,
     })
 
     return this.hp <= 0
@@ -52,6 +64,11 @@ export class Barricade {
 
   private updateBar() {
     const ratio = Math.max(0, this.hp / this.maxHp)
+    const damaged = ratio <= 0.5
+    this.body.setVisible(!damaged)
+    this.damagedBody.setVisible(damaged)
+    this.body.setAlpha(1)
+    this.damagedBody.setAlpha(1)
     this.bar.setScale(ratio, 1)
     if (ratio > 0.5) this.bar.setFillStyle(0x44cc66)
     else if (ratio > 0.25) this.bar.setFillStyle(0xddaa22)
