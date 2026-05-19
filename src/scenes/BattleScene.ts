@@ -665,8 +665,8 @@ export class BattleScene extends Phaser.Scene {
     const hex = '#' + color.toString(16).padStart(6, '0')
     const offsetX = (Math.random() - 0.5) * 20
     const txt = this.add.text(x + offsetX, y - 10, `${Math.round(damage)}`, {
-      fontSize: crit ? '22px' : '18px', color: hex, fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
+      fontSize: crit ? '30px' : '25px', color: hex, fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 5,
     }).setOrigin(0.5).setDepth(25)
     this.tweens.add({
       targets: txt, y: y - 50, alpha: 0,
@@ -787,8 +787,8 @@ export class BattleScene extends Phaser.Scene {
       ch.rangeMult *= mult
       ch.areaMult *= mult
     }
-    if (save.upgrades.researchProjectileLevel > 0 && ch.config.attackType !== 'beam' && ch.config.attackType !== 'slash') {
-      ch.actionCount += 1
+    if (save.upgrades.researchProjectileLevel > 0) {
+      ch.critChance = Math.min(0.65, ch.critChance + save.upgrades.researchProjectileLevel * 0.01)
     }
   }
 

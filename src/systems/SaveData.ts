@@ -61,6 +61,13 @@ export function markStageCleared(stageId: string): GameSave {
   return save
 }
 
+export function markStagePlayed(stageId: string): GameSave {
+  const save = loadSave()
+  save.lastPlayedStageId = stageId
+  saveGame(save)
+  return save
+}
+
 export function addOwnedWeapons(weaponIds: string[]): GameSave {
   const save = loadSave()
   for (const weaponId of weaponIds) {
@@ -79,6 +86,7 @@ export function normalizeSave(raw: Partial<GameSave>): GameSave {
 
   return {
     clearedStages: Array.isArray(raw.clearedStages) ? raw.clearedStages : [],
+    lastPlayedStageId: typeof raw.lastPlayedStageId === 'string' ? raw.lastPlayedStageId : undefined,
     ownedWeapons: Array.isArray(raw.ownedWeapons) ? raw.ownedWeapons.map(normalizeOwnedWeapon) : [],
     credits: typeof raw.credits === 'number' ? raw.credits : 0,
     upgrades: {

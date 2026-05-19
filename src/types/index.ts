@@ -166,6 +166,7 @@ export interface PermanentUpgrades {
 
 export interface GameSave {
   clearedStages: string[]
+  lastPlayedStageId?: string
   ownedWeapons: OwnedWeapon[]
   credits: number
   upgrades: PermanentUpgrades

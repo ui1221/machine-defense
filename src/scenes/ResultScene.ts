@@ -64,8 +64,18 @@ export class ResultScene extends Phaser.Scene {
     this.add.rectangle(portraitX, portraitY, SIDE_FRAME_W, SIDE_FRAME_H, SIDE_FRAME_FILL)
       .setStrokeStyle(2, accent)
     this.add.rectangle(portraitX, portraitY - SIDE_FRAME_H / 2 + 2, SIDE_FRAME_W - 12, 3, accent, 0.75)
-    this.add.image(portraitX, portraitY + 108, 'home_portrait')
-      .setScale(0.24)
+    const maskShape = this.add.graphics().setVisible(false)
+    maskShape.fillStyle(0xffffff)
+    maskShape.fillRect(
+      portraitX - SIDE_FRAME_W / 2 + 4,
+      portraitY - SIDE_FRAME_H / 2 + 4,
+      SIDE_FRAME_W - 8,
+      SIDE_FRAME_H - 8,
+    )
+    const portrait = this.add.image(portraitX + 8, portraitY + 8, 'home_portrait')
+      .setScale(0.2)
+    portrait.setMask(maskShape.createGeometryMask())
+    this.add.rectangle(portraitX, portraitY + 92, SIDE_FRAME_W - 18, 50, 0x07101a, 0.68)
     this.add.text(portraitX, portraitY + 82, 'アサルト型', {
       fontSize: '16px',
       color: '#ffffff',

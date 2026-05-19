@@ -5,7 +5,7 @@ import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { canEquipWeaponToCharacter, equipmentSlotLabel, RARITY_COLORS, WEAPONS } from '../data/weapons'
 import { RESEARCH_ITEMS, type ResearchItem } from '../data/research'
-import { loadSave, saveGame, upgradeCost } from '../systems/SaveData'
+import { loadSave, markStagePlayed, saveGame, upgradeCost } from '../systems/SaveData'
 import type { EquipmentSlot, GameSave, OwnedWeapon } from '../types'
 
 const TAB_H = 72
@@ -161,7 +161,7 @@ export class HomeScene extends Phaser.Scene {
       fontSize: '14px', color: '#8292aa',
     })
     const portraitShade = this.add.rectangle(GAME_W - 118, 426, 246, 690, 0x09101a, 0.16)
-    const portrait = this.add.image(GAME_W - 118, 654, 'home_portrait').setOrigin(0.5).setScale(0.56)
+    const portrait = this.add.image(GAME_W - 118, 596, 'home_portrait').setOrigin(0.5).setScale(0.56)
     const portraitName = this.add.text(GAME_W - 124, 642, 'アサルト型', {
       fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
@@ -198,6 +198,21 @@ export class HomeScene extends Phaser.Scene {
     return { x: SIDE_FRAME_X, y: SIDE_FRAME_Y, w: SIDE_FRAME_W, h: SIDE_FRAME_H }
   }
 
+  private addCompactPortrait(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ) {
+    const maskShape = this.add.graphics().setVisible(false)
+    maskShape.fillStyle(0xffffff)
+    maskShape.fillRect(x - w / 2 + 4, y - h / 2 + 4, w - 8, h - 8)
+    const portrait = this.add.image(x + 8, y + 8, 'home_portrait').setOrigin(0.5).setScale(0.2)
+    portrait.setMask(maskShape.createGeometryMask())
+    const labelBg = this.add.rectangle(x, y + 92, w - 18, 50, 0x07101a, 0.68)
+    return [maskShape, portrait, labelBg]
+  }
+
   private buildStagePanel(): Phaser.GameObjects.Container {
     const c = this.add.container(0, 0)
     this.save = this.loadSave()
@@ -229,10 +244,11 @@ export class HomeScene extends Phaser.Scene {
       const y = CONTENT_TOP + 20 + localIndex * 98
       const cleared = this.save.clearedStages.includes(stage.id)
       const unlocked = this.isStageUnlocked(i)
-      const bgColor = unlocked ? 0x1a2244 : 0x111827
-      const strokeColor = cleared ? 0x44ff88 : unlocked ? 0x334466 : 0x333344
+      const lastPlayed = this.save.lastPlayedStageId === stage.id
+      const bgColor = lastPlayed ? 0x243055 : unlocked ? 0x1a2244 : 0x111827
+      const strokeColor = lastPlayed ? 0xffdd66 : cleared ? 0x44ff88 : unlocked ? 0x334466 : 0x333344
       const bg = this.add.rectangle(GAME_W / 2, y + 30, GAME_W - 40, 78, bgColor)
-        .setStrokeStyle(2, strokeColor)
+        .setStrokeStyle(lastPlayed ? 3 : 2, strokeColor)
       if (unlocked) bg.setInteractive({ useHandCursor: true })
 
       const prefix = cleared ? '✓ ' : unlocked ? '' : 'LOCK '
@@ -245,13 +261,21 @@ export class HomeScene extends Phaser.Scene {
       const mult = this.add.text(GAME_W - 40, y + 10, `HP x${(stage.enemyHpMult ?? 1).toFixed(2)}`, {
         fontSize: '14px', color: unlocked ? '#ffdd88' : '#555566',
       }).setOrigin(1, 0)
+      const last = lastPlayed
+        ? this.add.text(GAME_W - 40, y + 54, '前回', {
+            fontSize: '13px', color: '#ffdd66', fontStyle: 'bold',
+          }).setOrigin(1, 0)
+        : null
 
       if (unlocked) {
-        bg.on('pointerdown', () => this.scene.start('BattleScene', { stageId: stage.id }))
+        bg.on('pointerdown', () => {
+          markStagePlayed(stage.id)
+          this.scene.start('BattleScene', { stageId: stage.id })
+        })
         bg.on('pointerover', () => bg.setFillStyle(0x2a3366))
         bg.on('pointerout', () => bg.setFillStyle(bgColor))
       }
-      c.add([bg, name, desc, mult])
+      c.add(last ? [bg, name, desc, mult, last] : [bg, name, desc, mult])
     })
     return c
   }
@@ -310,8 +334,9 @@ export class HomeScene extends Phaser.Scene {
     const atkGrowthRate = cfg.upgradeAtkGrowthRate ?? 0.06
     const critGrowth = cfg.upgradeCritGrowth ?? 0.001
     const nextLevel = Math.min(level + 1, levelCap)
-    const currentAtk = cfg.atk * (1 + atkGrowthRate * level)
-    const nextAtk = cfg.atk * (1 + atkGrowthRate * nextLevel)
+    const researchAtkMult = 1 + Number(this.save.upgrades.researchAtkLevel ?? 0) * 0.05
+    const currentAtk = cfg.atk * (1 + atkGrowthRate * level) * researchAtkMult
+    const nextAtk = cfg.atk * (1 + atkGrowthRate * nextLevel) * researchAtkMult
     const baseCrit = (cfg.baseCritChance ?? 0) * 100
     const currentCrit = Math.min(65, baseCrit + level * critGrowth * 100)
     const nextCrit = Math.min(65, baseCrit + nextLevel * critGrowth * 100)
@@ -325,16 +350,22 @@ export class HomeScene extends Phaser.Scene {
     c.add(this.add.text(GAME_W / 2, CONTENT_TOP - 22, 'キャラ管理', {
       fontSize: '17px', color: '#aaaacc',
     }).setOrigin(0.5))
-    const side = { x: SIDE_FRAME_X, y: SIDE_FRAME_Y, w: SIDE_FRAME_W, h: SIDE_FRAME_H }
+    const side = this.addSideFrame(c)
     const divider = this.add.rectangle(250, CONTENT_TOP + 188, 1, 250, 0x2a344f, 0.55)
     c.add(divider)
-    const icon = this.add.text(side.x, side.y - 38, cfg.emoji, { fontSize: '58px' }).setOrigin(0.5)
+    const sideVisual: Array<Phaser.GameObjects.GameObject & { setVisible: (visible: boolean) => unknown }> = []
+    if (cfg.id === 'assault') {
+      sideVisual.push(...this.addCompactPortrait(side.x, side.y, side.w, side.h))
+    } else {
+      sideVisual.push(this.add.text(side.x, side.y - 38, cfg.emoji, { fontSize: '58px' }).setOrigin(0.5))
+    }
     const sideName = this.add.text(side.x, side.y + 38, cfg.name, {
       fontSize: '15px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5)
     const sideLevel = this.add.text(side.x, side.y + 62, `Lv.${level}/${levelCap}`, {
       fontSize: '15px', color: '#ffdd88', fontStyle: 'bold',
     }).setOrigin(0.5)
+    const sideObjects = [...sideVisual, sideName, sideLevel]
     const name = this.add.text(36, CONTENT_TOP + 34, cfg.name, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
     const desc = this.add.text(36, CONTENT_TOP + 66, cfg.description, { fontSize: '14px', color: '#7f91ad', wordWrap: { width: 260 } })
     const levelTitle = this.add.text(38, CONTENT_TOP + 108, `Lv.${level}/${levelCap}`, {
@@ -388,15 +419,13 @@ export class HomeScene extends Phaser.Scene {
 
     const isSelectingEquipment = this.selectingEquipmentForCharId === cfg.id
     if (isSelectingEquipment) {
-      icon.setVisible(false)
-      sideName.setVisible(false)
-      sideLevel.setVisible(false)
+      sideObjects.forEach(obj => obj.setVisible(false))
       upgradeBtn.setVisible(false)
       upgradeText.setVisible(false)
     }
     c.add(isSelectingEquipment
       ? [name, desc, levelTitle, stats, ...slotObjects]
-      : [icon, sideName, sideLevel, name, desc, levelTitle, stats, ...slotObjects, upgradeBtn, upgradeText])
+      : [...sideObjects, name, desc, levelTitle, stats, ...slotObjects, upgradeBtn, upgradeText])
 
     if (isSelectingEquipment) this.buildCharacterEquipList(c, cfg.id)
     this.buildCharacterSelector(c, cfg.id)
@@ -924,6 +953,26 @@ export class HomeScene extends Phaser.Scene {
       const y = CONTENT_TOP + 16 + row * 84
       this.createResearchCard(c, item, x, y, cardW)
     })
+    this.createResearchResetCard(c, CONTENT_TOP + 16 + 3 * 84)
+  }
+
+  private createResearchResetCard(parent: Phaser.GameObjects.Container, y: number) {
+    const refund = this.calcResearchRefund()
+    const canReset = refund > 0
+    this.createInfoCard(parent, {
+      x: GAME_W / 2,
+      y,
+      cardW: GAME_W - 40,
+      icon: '↺',
+      name: '強化のやり直し',
+      description: canReset ? `研究を初期化して ${refund} CREDIT を返却` : '初期化できる研究はありません',
+      meta: canReset ? 'RESET' : 'EMPTY',
+      borderColor: canReset ? 0xcc8866 : 0x445a7a,
+      iconColor: 0xcc8866,
+      metaColor: canReset ? '#ffdd88' : '#777788',
+      selected: false,
+      onClick: canReset ? () => this.showResearchResetConfirm(refund) : undefined,
+    })
   }
 
   private createResearchCard(parent: Phaser.GameObjects.Container, item: ResearchItem, x: number, y: number, cardW: number) {
@@ -956,6 +1005,13 @@ export class HomeScene extends Phaser.Scene {
     this.showConfirmDialog(
       `${item.name}\nLv.${level} -> Lv.${level + 1}\n${item.nextText(level)}\n${cost} CREDIT で研究します。\nよろしいですか？`,
       () => this.buyResearchUpgrade(item.id, cost),
+    )
+  }
+
+  private showResearchResetConfirm(refund: number) {
+    this.showConfirmDialog(
+      `研究を初期化します。\nクレジットは返却されます。\n返却: ${refund} CREDIT\nよろしいですか？`,
+      () => this.resetResearchUpgrades(),
     )
   }
 
@@ -1047,6 +1103,28 @@ export class HomeScene extends Phaser.Scene {
     if (!item || current >= item.maxLevel) return
     this.save.credits -= cost
     this.save.upgrades[key] = current + 1
+    saveGame(this.save)
+    this.refreshTopStatus()
+    this.rebuildPanel(3, this.buildShopPanel())
+    this.panels[3].setVisible(true)
+  }
+
+  private calcResearchRefund() {
+    return RESEARCH_ITEMS.reduce((sum, item) => {
+      const level = Math.min(Number(this.save.upgrades[item.id] ?? 0), item.maxLevel)
+      for (let i = 0; i < level; i += 1) sum += item.cost(i)
+      return sum
+    }, 0)
+  }
+
+  private resetResearchUpgrades() {
+    this.save = this.loadSave()
+    const refund = this.calcResearchRefund()
+    if (refund <= 0) return
+    for (const item of RESEARCH_ITEMS) {
+      this.save.upgrades[item.id] = 0
+    }
+    this.save.credits += refund
     saveGame(this.save)
     this.refreshTopStatus()
     this.rebuildPanel(3, this.buildShopPanel())
