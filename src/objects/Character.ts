@@ -26,13 +26,12 @@ export class Character extends Phaser.GameObjects.Container {
     this.critChance = cfg.baseCritChance ?? 0
     this.burstCount = cfg.baseBurstCount ?? 1
 
-    const base = scene.add.rectangle(0, 16, 40, 8, 0x334455, 0.6)
     this.label = scene.add.text(0, 0, cfg.emoji, { fontSize: '36px' }).setOrigin(0.5)
 
     const cdBg = scene.add.rectangle(0, 26, 36, 4, 0x222233)
     this.cooldownBar = scene.add.rectangle(-18, 26, 36, 4, 0xff8844).setOrigin(0, 0.5)
 
-    this.add([base, this.label, cdBg, this.cooldownBar])
+    this.add([this.label, cdBg, this.cooldownBar])
     this.setDepth(5)
   }
 

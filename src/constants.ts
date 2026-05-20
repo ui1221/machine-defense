@@ -28,8 +28,8 @@ export const FIELD_RIGHT = GAME_W - 20
 // 中央から左右へ広がる固定スロット位置。
 export const CHAR_SLOTS: number[] = [
   GAME_W / 2,
-  GAME_W / 2 - 74,
-  GAME_W / 2 + 74,
-  GAME_W / 2 - 148,
-  GAME_W / 2 + 148,
+  GAME_W / 2 - 82,
+  GAME_W / 2 + 82,
+  GAME_W / 2 - 164,
+  GAME_W / 2 + 164,
 ]

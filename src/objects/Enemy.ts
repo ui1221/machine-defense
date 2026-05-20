@@ -30,6 +30,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   private lastHealTime = 0
 
   private label: Phaser.GameObjects.Text | Phaser.GameObjects.Sprite
+  private hpBg: Phaser.GameObjects.Rectangle
   private hpBar: Phaser.GameObjects.Rectangle
   private bodyCircle: Phaser.GameObjects.Arc
 
@@ -57,10 +58,11 @@ export class Enemy extends Phaser.GameObjects.Container {
     } else {
       this.label = scene.add.text(0, 0, cfg.emoji, { fontSize }).setOrigin(0.5)
     }
-    const hpBg = scene.add.rectangle(0, hpBarY, hpBarWidth, isBoss ? 8 : 4, 0x333333)
+    this.hpBg = scene.add.rectangle(0, hpBarY, hpBarWidth, isBoss ? 8 : 4, 0x333333).setVisible(false)
     this.hpBar = scene.add.rectangle(0, hpBarY, hpBarWidth, isBoss ? 8 : 4, isBoss ? 0xffaa44 : 0xff4444)
+      .setVisible(false)
 
-    this.add([this.bodyCircle, this.label, hpBg, this.hpBar])
+    this.add([this.bodyCircle, this.label, this.hpBg, this.hpBar])
     this.setDepth(isBoss ? 14 : 10)
   }
 
@@ -69,6 +71,8 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.lastDamageTaken = actual
     this.hp = Math.max(0, this.hp - actual)
     const ratio = this.hp / this.maxHp
+    this.hpBg.setVisible(true)
+    this.hpBar.setVisible(true)
     this.hpBar.setScale(ratio, 1)
 
     this.label.setAlpha(0.5)
@@ -161,7 +165,10 @@ export class Enemy extends Phaser.GameObjects.Container {
 
   heal(amount: number) {
     this.hp = Math.min(this.maxHp, this.hp + amount)
-    this.hpBar.setScale(this.hp / this.maxHp, 1)
+    const ratio = this.hp / this.maxHp
+    this.hpBg.setVisible(ratio < 1)
+    this.hpBar.setVisible(ratio < 1)
+    this.hpBar.setScale(ratio, 1)
     const txt = this.scene.add.text(this.x, this.y - 28, `+${amount}`, {
       fontSize: '12px',
       color: '#88ffbb',

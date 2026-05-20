@@ -6,7 +6,7 @@ import {
 import { STAGES } from '../data/stages'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { canEquipWeaponToCharacter, WEAPONS, WEAPON_DROP_RATE, RARITY_WEIGHTS } from '../data/weapons'
+import { canEquipWeaponToCharacter, WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
 import { Character } from '../objects/Character'
 import { Enemy } from '../objects/Enemy'
 import { Bullet } from '../objects/Bullet'
@@ -78,14 +78,6 @@ export class BattleScene extends Phaser.Scene {
     // 背景は後から画像に差し替えやすいよう、戦場・防衛帯・足元で分けておく。
     this.buildBattleBackground()
     this.add.rectangle(GAME_W / 2, BARRICADE_Y - 42, GAME_W - 28, 4, 0x293149, 0.9).setDepth(1)
-    this.add.rectangle(GAME_W / 2, BARRICADE_Y + 74, GAME_W, 150, 0x181b29, 0.95).setDepth(0)
-    this.add.rectangle(GAME_W / 2, BARRICADE_Y + 24, GAME_W - 24, 118, 0x202538, 0.34)
-      .setStrokeStyle(1, 0x39425f, 0.6)
-      .setDepth(1)
-    this.add.rectangle(GAME_W / 2, GAME_H - 34, GAME_W - 36, 58, 0x0d1018, 0.9)
-      .setStrokeStyle(1, 0x263047, 0.8)
-      .setDepth(1)
-
     this.enemies = this.add.group({ runChildUpdate: false })
     this.bullets = this.add.group({ runChildUpdate: false })
 
@@ -103,8 +95,14 @@ export class BattleScene extends Phaser.Scene {
 
   private buildBattleBackground() {
     const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
-    if (stageNo <= 4) {
-      const bg = this.add.image(GAME_W / 2, GAME_H / 2, 'stage_forest_bg').setOrigin(0.5).setDepth(-10)
+    const bgKey = stageNo <= 3 ? 'stage_forest_bg'
+      : stageNo <= 6 ? 'stage_facility_entrance_bg'
+        : stageNo <= 15 ? 'stage_base_day_bg'
+          : stageNo <= 23 ? 'stage_base_evening_bg'
+            : stageNo <= 30 ? 'stage_base_night_bg'
+              : null
+    if (bgKey) {
+      const bg = this.add.image(GAME_W / 2, GAME_H / 2, bgKey).setOrigin(0.5).setDepth(-10)
       const src = bg.texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement
       bg.setScale(Math.max(GAME_W / src.width, GAME_H / src.height))
       this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x071018, 0.34).setDepth(-9)
@@ -585,11 +583,6 @@ export class BattleScene extends Phaser.Scene {
   private onEnemyKilled(enemy: Enemy) {
     this.killCount++
     if (enemy.hasAbility('split')) this.spawnSplitEnemies(enemy)
-    if (Math.random() < this.currentWeaponDropRate()) {
-      const id = this.pickDroppedWeaponId()
-      this.droppedWeapons.push(id)
-      this.showDropEffect(enemy.x, enemy.y, WEAPONS[id].emoji)
-    }
     const leveledUp = this.levelUpManager.addExp(enemy.expReward * this.expMult)
     this.events.emit('expChanged')
     if (leveledUp) this.onLevelUp()
@@ -618,14 +611,6 @@ export class BattleScene extends Phaser.Scene {
       alpha: 0,
       duration: 600,
       onComplete: () => txt.destroy(),
-    })
-  }
-
-  private showDropEffect(x: number, y: number, emoji: string) {
-    const txt = this.add.text(x, y, emoji, { fontSize: '28px' }).setOrigin(0.5).setDepth(20)
-    this.tweens.add({
-      targets: txt, y: y - 60, alpha: 0, duration: 1200,
-      ease: 'Sine.easeOut', onComplete: () => txt.destroy(),
     })
   }
 
@@ -805,20 +790,27 @@ export class BattleScene extends Phaser.Scene {
     return loadSave()
   }
 
-  private currentWeaponDropRate() {
+  private currentStageDropRate() {
     const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
-    const tier = Math.floor((stageNo - 1) / 5)
-    return WEAPON_DROP_RATE * (1 + tier * 0.25)
+    const progress = Phaser.Math.Clamp((stageNo - 1) / 29, 0, 1)
+    const bossBonus = this.hasBossSpawn() ? 0.1 : 0
+    return Phaser.Math.Clamp(0.05 + progress * 0.2 + bossBonus, 0, 0.95)
+  }
+
+  private hasBossSpawn() {
+    return this.stage.spawnTable.some(entry => ENEMIES[entry.enemyId]?.abilities?.includes('boss'))
   }
 
   private pickDroppedWeaponId() {
     const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
-    const tier = Math.floor((stageNo - 1) / 10)
+    const progress = Phaser.Math.Clamp((stageNo - 1) / 29, 0, 1)
     const entries = Object.values(WEAPONS)
     const weighted = entries.map(w => {
-      const base = RARITY_WEIGHTS[w.rarity]
-      const lateBonus = w.rarity === 'SR' ? 1 + tier * 0.35 : w.rarity === 'SSR' ? 1 + tier * 0.55 : 1
-      return { id: w.id, weight: base * lateBonus }
+      let weight = RARITY_WEIGHTS[w.rarity]
+      if (w.rarity === 'N') weight *= 1 - progress * 0.55
+      if (w.rarity === 'SR') weight *= 1 + progress * 4
+      if (w.rarity === 'SSR') weight *= 1 + progress * 5
+      return { id: w.id, weight }
     })
     const total = weighted.reduce((sum, w) => sum + w.weight, 0)
     let roll = Math.random() * total
@@ -827,6 +819,11 @@ export class BattleScene extends Phaser.Scene {
       if (roll <= 0) return item.id
     }
     return weighted[0].id
+  }
+
+  private rollStageDrops() {
+    if (Math.random() >= this.currentStageDropRate()) return
+    this.droppedWeapons.push(this.pickDroppedWeaponId())
   }
 
   private buildBattleState(): BattleState {
@@ -851,6 +848,7 @@ export class BattleScene extends Phaser.Scene {
   private endGame(victory: boolean) {
     if (this.gameEnded) return
     this.gameEnded = true
+    if (victory) this.rollStageDrops()
     this.inputManager.pause()
     this.time.delayedCall(800, () => {
       this.scene.stop('BattleUIScene')

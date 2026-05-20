@@ -154,21 +154,9 @@ export class HomeScene extends Phaser.Scene {
     const c = this.add.container(0, 0)
     this.hubHomeContainer = c
     const tint = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x09101d, 0.28)
-    const roomTitle = this.add.text(28, 142, '拠点背景差し替え予定', {
-      fontSize: '16px', color: '#d7e3f4', fontStyle: 'bold',
-    })
-    const roomNote = this.add.text(28, 170, '背景全面に室内ビジュアルを配置する想定', {
-      fontSize: '14px', color: '#8292aa',
-    })
     const portraitShade = this.add.rectangle(GAME_W - 118, 426, 246, 690, 0x09101a, 0.16)
     const portrait = this.add.image(GAME_W - 118, 596, 'home_portrait').setOrigin(0.5).setScale(0.56)
-    const portraitName = this.add.text(GAME_W - 124, 642, 'アサルト型', {
-      fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    const portraitNote = this.add.text(GAME_W - 124, 668, '立ち絵仮置き', {
-      fontSize: '15px', color: '#8292aa',
-    }).setOrigin(0.5)
-    c.add([tint, roomTitle, roomNote, portraitShade, portrait, portraitName, portraitNote])
+    c.add([tint, portraitShade, portrait])
     this.shellObjects.forEach(obj => obj.setVisible(true))
   }
 
@@ -209,8 +197,7 @@ export class HomeScene extends Phaser.Scene {
     maskShape.fillRect(x - w / 2 + 4, y - h / 2 + 4, w - 8, h - 8)
     const portrait = this.add.image(x + 8, y + 8, 'home_portrait').setOrigin(0.5).setScale(0.2)
     portrait.setMask(maskShape.createGeometryMask())
-    const labelBg = this.add.rectangle(x, y + 92, w - 18, 50, 0x07101a, 0.68)
-    return [maskShape, portrait, labelBg]
+    return [maskShape, portrait]
   }
 
   private buildStagePanel(): Phaser.GameObjects.Container {
@@ -359,13 +346,7 @@ export class HomeScene extends Phaser.Scene {
     } else {
       sideVisual.push(this.add.text(side.x, side.y - 38, cfg.emoji, { fontSize: '58px' }).setOrigin(0.5))
     }
-    const sideName = this.add.text(side.x, side.y + 38, cfg.name, {
-      fontSize: '15px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    const sideLevel = this.add.text(side.x, side.y + 62, `Lv.${level}/${levelCap}`, {
-      fontSize: '15px', color: '#ffdd88', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    const sideObjects = [...sideVisual, sideName, sideLevel]
+    const sideObjects = [...sideVisual]
     const name = this.add.text(36, CONTENT_TOP + 34, cfg.name, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
     const desc = this.add.text(36, CONTENT_TOP + 66, cfg.description, { fontSize: '14px', color: '#7f91ad', wordWrap: { width: 260 } })
     const levelTitle = this.add.text(38, CONTENT_TOP + 108, `Lv.${level}/${levelCap}`, {
@@ -561,7 +542,8 @@ export class HomeScene extends Phaser.Scene {
     const viewTop = CONTENT_TOP + 10
     const viewBottom = GAME_H - TAB_H - 8
     const viewHeight = viewBottom - viewTop
-    const rowCount = Math.ceil(this.save.ownedWeapons.length / 2)
+    const sortedItems = this.sortedOwnedWeapons(this.save.ownedWeapons)
+    const rowCount = Math.ceil(sortedItems.length / 2)
     const contentHeight = rowCount * 80 + 10
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     let scrollY = 0
@@ -585,7 +567,7 @@ export class HomeScene extends Phaser.Scene {
     scrollHit.on('pointerup', () => { dragging = false })
     scrollHit.on('pointerout', () => { dragging = false })
 
-    this.save.ownedWeapons.forEach((owned, i) => {
+    sortedItems.forEach((owned, i) => {
       const col = i % 2
       const row = Math.floor(i / 2)
       const cardW = (GAME_W - 54) / 2
@@ -739,10 +721,25 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private rarityTextColor(rarity: string) {
-    if (rarity === 'N') return '#9aa4b2'
-    if (rarity === 'R') return '#ffffff'
-    if (rarity === 'SR') return '#ffdd66'
-    return '#ffcc44'
+    const color = RARITY_COLORS[rarity as keyof typeof RARITY_COLORS] ?? 0xffffff
+    return '#' + color.toString(16).padStart(6, '0')
+  }
+
+  private sortedOwnedWeapons(items: OwnedWeapon[]) {
+    const slotOrder: Record<EquipmentSlot, number> = { weapon: 0, core: 1, sensor: 2, module: 3 }
+    const rarityOrder = { N: 0, R: 1, SR: 2, SSR: 3 }
+    return [...items].sort((a, b) => {
+      const aw = WEAPONS[a.weaponId]
+      const bw = WEAPONS[b.weaponId]
+      if (!aw || !bw) return aw ? -1 : bw ? 1 : 0
+      const slotDiff = slotOrder[aw.slot] - slotOrder[bw.slot]
+      if (slotDiff !== 0) return slotDiff
+      const rarityDiff = rarityOrder[aw.rarity] - rarityOrder[bw.rarity]
+      if (rarityDiff !== 0) return rarityDiff
+      const nameDiff = aw.name.localeCompare(bw.name, 'ja')
+      if (nameDiff !== 0) return nameDiff
+      return (a.level ?? 0) - (b.level ?? 0)
+    })
   }
 
   private sellPrice(owned: OwnedWeapon) {
