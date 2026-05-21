@@ -788,10 +788,6 @@ export class HomeScene extends Phaser.Scene {
         .setStrokeStyle(2, selected ? 0x7cc8ff : 0x334466, selected ? 0.9 : 0.52)
         .setInteractive({ useHandCursor: true })
       const emoji = this.add.text(x, y - 2, ch.emoji, { fontSize: '21px' }).setOrigin(0.5)
-      const lv = Number(this.save.upgrades[(ch.id + 'AtkLevel') as keyof GameSave['upgrades']] ?? 0)
-      const lvText = this.add.text(x, y + 28, `Lv.${lv}`, {
-        fontSize: '13px', color: selected ? '#ffffff' : '#a8b8d0', fontStyle: selected ? 'bold' : '',
-      }).setOrigin(0.5)
       bg.on('pointerdown', () => {
         this.selectedCharacterId = ch.id
         this.selectingEquipmentForCharId = null
@@ -799,69 +795,69 @@ export class HomeScene extends Phaser.Scene {
         this.rebuildPanel(1, this.buildCharPanel())
         this.panels[1].setVisible(true)
       })
-      c.add([bg, emoji, lvText])
+      c.add([bg, emoji])
     })
   }
 
   private buildCharacterEquipList(c: Phaser.GameObjects.Container, charId: string) {
     const slot = this.selectingEquipmentSlot ?? 'weapon'
     const current = this.getEquippedBySlot(charId).get(slot)
-    const list = this.add.container(0, 0).setDepth(45)
-    c.add(list)
 
-    const panelW = (GAME_W - 54) / 2
-    const panelX = GAME_W - 20 - panelW / 2
-    const viewTop = CONTENT_TOP + 16
-    const viewBottom = GAME_H - TAB_H - 76
+    const panelX = 0
+    const panelY = CONTENT_TOP + 58
+    const panelW = GAME_W - panelX
+    const panelH = GAME_H - TAB_H - panelY - 8
+    const viewTop = panelY + 42
+    const viewBottom = GAME_H - TAB_H - 18
     const viewHeight = viewBottom - viewTop
-    const cardH = 74
-    const gap = 8
+    const rowH = 68
     const slotItems = this.save.ownedWeapons.filter(owned => {
       const weapon = WEAPONS[owned.weaponId]
       return weapon?.slot === slot && canEquipWeaponToCharacter(weapon, charId)
     })
-    const contentHeight = Math.max(viewHeight, 40 + slotItems.length * (cardH + gap) + 8)
+    const contentHeight = Math.max(viewHeight, 48 + slotItems.length * rowH + 8)
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     let scrollY = 0
 
-    const maskShape = this.add.rectangle(panelX, (viewTop + viewBottom) / 2, panelW + 4, viewHeight, 0xffffff)
+    this.createSelectionPanel(c, panelX, panelY, panelW, panelH)
+    const list = this.add.container(0, 0).setDepth(45)
+    c.add(list)
+
+    const maskShape = this.add.rectangle(panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, 0xffffff)
     maskShape.setVisible(false)
     const mask = maskShape.createGeometryMask()
     list.setMask(mask)
     c.add(maskShape)
 
-    const title = this.add.text(panelX, viewTop - 22, equipmentSlotLabel(slot), {
-      fontSize: '15px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    const close = this.add.text(panelX + panelW / 2 - 10, viewTop - 23, 'x', {
-      fontSize: '18px', color: '#aab8cc', fontStyle: 'bold',
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-    close.on('pointerdown', () => {
+    const back = this.add.text(panelX + 14, panelY + 12, '<', {
+      fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
+    }).setInteractive({ useHandCursor: true })
+    const title = this.add.text(panelX + panelW / 2, panelY + 13, `${equipmentSlotLabel(slot)}を選択`, {
+      fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5, 0)
+    back.on('pointerdown', () => {
       this.selectingEquipmentForCharId = null
       this.selectingEquipmentSlot = null
       this.rebuildPanel(1, this.buildCharPanel())
       this.panels[1].setVisible(true)
     })
-    c.add([title, close])
+    c.add([back, title])
+    if (current) {
+      const remove = this.add.text(panelX + panelW - 16, panelY + 13, '外す', {
+        fontSize: '15px', color: '#ffb0a0', fontStyle: 'bold',
+      }).setOrigin(1, 0).setInteractive({ useHandCursor: true })
+      remove.on('pointerdown', () => this.unequipCharacterWeapon(charId, slot))
+      c.add(remove)
+    }
 
     const applyScroll = (next: number) => {
       scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
       list.y = -scrollY
     }
-    this.bindPanelScroll(c, panelX, (viewTop + viewBottom) / 2, panelW + 4, viewHeight, delta => applyScroll(scrollY + delta))
-
-    const emptyY = viewTop + 4
-    const emptyBg = this.add.rectangle(panelX, emptyY + 16, panelW, 32, current ? 0x442222 : 0x222233, 0.74)
-      .setStrokeStyle(1, current ? 0xaa5555 : 0x555566, 0.55)
-      .setInteractive({ useHandCursor: !!current })
-    const emptyText = this.add.text(panelX, emptyY + 16, current ? '\u5916\u3059' : '\u7a7a\u304d', {
-      fontSize: '14px', color: current ? '#ffffff' : '#777788', fontStyle: 'bold',
-    }).setOrigin(0.5)
-    if (current) emptyBg.on('pointerdown', () => this.unequipCharacterWeapon(charId, slot))
-    list.add([emptyBg, emptyText])
+    this.bindPanelScroll(c, panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, delta => applyScroll(scrollY + delta))
 
     if (slotItems.length === 0) {
-      const none = this.add.text(panelX, viewTop + 74, '\u88c5\u5099\u3067\u304d\u308b\n\u30a2\u30a4\u30c6\u30e0\u306a\u3057', {
+      const none = this.add.text(panelX + panelW / 2, viewTop + 56, '\u88c5\u5099\u3067\u304d\u308b\n\u30a2\u30a4\u30c6\u30e0\u306a\u3057', {
         fontSize: '13px', color: '#667788', align: 'center', lineSpacing: 4,
       }).setOrigin(0.5)
       list.add(none)
@@ -869,21 +865,41 @@ export class HomeScene extends Phaser.Scene {
     }
 
     slotItems.forEach((owned, i) => {
-      const y = viewTop + 44 + i * (cardH + gap)
-      this.createItemCard(list, owned, panelX, y, panelW, {
-        selected: owned.uid === current?.uid,
-        showEquippedTo: true,
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon) return
+      const equippedByOther = !!owned.equippedCharId && owned.equippedCharId !== charId
+      const equippedOwner = equippedByOther ? CHARACTERS[owned.equippedCharId!]?.name ?? owned.equippedCharId : null
+      const y = viewTop + 4 + i * rowH
+      this.createListRow(list, {
+        x: panelX,
+        y,
+        w: panelW,
+        h: rowH,
+        icon: weapon.emoji,
+        iconColor: RARITY_COLORS[weapon.rarity],
+        title: this.equipmentDisplayName(weapon.name, owned.level),
+        detail: this.compactEquipmentDescription(weapon.description),
+        meta: owned.uid === current?.uid ? '装備中' : equippedOwner ? `${equippedOwner} 装備中` : weapon.rarity,
+        enabled: !equippedByOther,
         onDragDelta: delta => applyScroll(scrollY + delta),
-        onClick: () => this.equipWeaponToCharacter(owned.uid, charId, slot),
+        onClick: equippedByOther ? undefined : () => this.equipWeaponToCharacter(owned.uid, charId, slot),
       })
     })
 
     if (maxScroll > 0) {
-      c.add(this.add.text(panelX + panelW / 2 - 8, viewBottom - 4, 'v', {
-        fontSize: '12px', color: '#556680',
+      c.add(this.add.text(panelX + panelW / 2, panelY + panelH - 22, '▼', {
+        fontSize: '13px', color: '#7d8ca3',
       }).setOrigin(0.5).setDepth(46))
     }
   }
+
+  private createSelectionPanel(parent: Phaser.GameObjects.Container, x: number, y: number, w: number, h: number) {
+    const bg = this.add.rectangle(x + w / 2, y + h / 2, w, h, UI_EDGE_BUTTON_FILL, 0.98)
+      .setStrokeStyle(UI_EDGE_BUTTON_STROKE_WIDTH, UI_EDGE_BUTTON_ACCENT, 0.46)
+    parent.add(bg)
+    return { bg }
+  }
+
   private buildItemInventory(c: Phaser.GameObjects.Container, topOffset = 0) {
     if (this.save.ownedWeapons.length === 0) {
       c.add(this.add.text(GAME_W / 2, CONTENT_TOP + 230 + topOffset, 'アイテムはまだありません\n戦闘報酬で装備を入手できます。', {
@@ -898,8 +914,8 @@ export class HomeScene extends Phaser.Scene {
     const viewBottom = GAME_H - TAB_H - 8
     const viewHeight = viewBottom - viewTop
     const sortedItems = this.sortedOwnedWeapons(this.save.ownedWeapons)
-    const rowCount = Math.ceil(sortedItems.length / 2)
-    const contentHeight = rowCount * 80 + 10
+    const rowH = 68
+    const contentHeight = sortedItems.length * rowH + 10
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     let scrollY = 0
     const applyScroll = (next: number) => {
@@ -923,12 +939,20 @@ export class HomeScene extends Phaser.Scene {
     scrollHit.on('pointerout', () => { dragging = false })
 
     sortedItems.forEach((owned, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const cardW = (GAME_W - 54) / 2
-      const x = 20 + cardW / 2 + col * (cardW + 14)
-      const y = CONTENT_TOP + 16 + topOffset + row * 80
-      this.createItemCard(list, owned, x, y, cardW)
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon) return
+      const y = CONTENT_TOP + 10 + topOffset + i * rowH
+      this.createListRow(list, {
+        x: 0,
+        y,
+        w: GAME_W,
+        h: rowH,
+        icon: weapon.emoji,
+        iconColor: this.equipmentSlotColor(weapon.slot),
+        title: this.equipmentDisplayName(weapon.name, owned.level),
+        detail: this.compactEquipmentDescription(weapon.description),
+        meta: weapon.rarity,
+      })
     })
 
     if (maxScroll > 0) {
@@ -988,9 +1012,13 @@ export class HomeScene extends Phaser.Scene {
     },
   ) {
     const { x, y, cardW } = params
-    const cardH = 74
-    const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, params.selected ? 0x1e3150 : 0x111a33, params.selected ? 0.88 : 0.62)
-      .setStrokeStyle(1, params.selected ? 0xffdd66 : params.borderColor, params.selected ? 0.95 : 0.5)
+    const cardH = 76
+    const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, params.selected ? 0x1e3150 : UI_EDGE_BUTTON_FILL, params.selected ? 0.88 : 0.66)
+      .setStrokeStyle(
+        params.selected ? UI_ACTIVE_STROKE_WIDTH : UI_EDGE_BUTTON_STROKE_WIDTH,
+        params.selected ? UI_ACTIVE_STROKE_COLOR : params.borderColor,
+        params.selected ? UI_ACTIVE_STROKE_ALPHA : 0.54,
+      )
     if (params.onClick || params.onDragDelta) {
       let downY = 0
       let moved = 0
@@ -1014,18 +1042,95 @@ export class HomeScene extends Phaser.Scene {
       })
       bg.on('pointerout', () => { pressed = false })
     }
-    const iconBg = this.add.circle(x - cardW / 2 + 28, y + 25, 18, params.iconColor, 0.18)
-    const icon = this.add.text(x - cardW / 2 + 28, y + 22, params.icon, { fontSize: '18px' }).setOrigin(0.5)
+    const iconBg = this.add.circle(x - cardW / 2 + 30, y + 27, 18, params.iconColor, 0.2)
+    const icon = this.add.text(x - cardW / 2 + 30, y + 24, params.icon, { fontSize: '18px' }).setOrigin(0.5)
     const name = this.add.text(x - cardW / 2 + 52, y + 10, params.name, {
-      fontSize: '14px', color: '#ffffff', fontStyle: params.selected ? 'bold' : '', wordWrap: { width: cardW - 64 },
+      fontSize: '15px', color: '#ffffff', fontStyle: params.selected ? 'bold' : '', wordWrap: { width: cardW - 70 },
     })
     const effect = this.add.text(x - cardW / 2 + 52, y + 31, params.description, {
-      fontSize: '12px', color: '#88aacc', wordWrap: { width: cardW - 64 },
+      fontSize: '13px', color: '#9fb0c8', wordWrap: { width: cardW - 70 },
     })
     const meta = this.add.text(x + cardW / 2 - 10, y + 10, params.meta, {
       fontSize: '12px', color: params.metaColor, fontStyle: 'bold',
     }).setOrigin(1, 0)
     const objects: Phaser.GameObjects.GameObject[] = [bg, iconBg, icon, name, effect, meta]
+    parent.add(objects)
+    return objects
+  }
+
+  private createListRow(
+    parent: Phaser.GameObjects.Container,
+    params: {
+      x: number
+      y: number
+      w: number
+      h: number
+      icon: string
+      iconColor: number
+      title: string
+      detail: string
+      meta?: string
+      enabled?: boolean
+      onClick?: () => void
+      onDragDelta?: (delta: number) => void
+    },
+  ) {
+    const { x, y, w, h } = params
+    const enabled = params.enabled ?? true
+    const bg = this.add.rectangle(x + w / 2, y + h / 2, w, h, UI_EDGE_BUTTON_FILL, enabled ? 0.36 : 0.18)
+    const line = this.add.rectangle(x + w / 2, y + h - 1, w - 24, 1, 0x8aa0bb, enabled ? 0.18 : 0.08)
+    if (enabled && (params.onClick || params.onDragDelta)) {
+      let downY = 0
+      let moved = 0
+      let pressed = false
+      bg.setInteractive({ useHandCursor: !!params.onClick })
+      bg.on('pointerdown', (p: Phaser.Input.Pointer) => {
+        downY = p.y
+        moved = 0
+        pressed = true
+        bg.setFillStyle(0x132137, 0.58)
+      })
+      bg.on('pointermove', (p: Phaser.Input.Pointer) => {
+        if (!pressed || !p.isDown || !params.onDragDelta) return
+        const delta = downY - p.y
+        moved += Math.abs(delta)
+        downY = p.y
+        params.onDragDelta(delta)
+      })
+      bg.on('pointerup', () => {
+        if (pressed && moved < 8) params.onClick?.()
+        pressed = false
+        bg.setFillStyle(UI_EDGE_BUTTON_FILL, 0.36)
+      })
+      bg.on('pointerout', () => {
+        pressed = false
+        bg.setFillStyle(UI_EDGE_BUTTON_FILL, 0.36)
+      })
+    }
+    const icon = this.add.text(x + 34, y + h / 2 - 2, params.icon, {
+      fontSize: '19px',
+      color: enabled ? '#ffffff' : '#667188',
+      fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const textBlockY = y + h / 2 - 19
+    const title = this.add.text(x + 66, textBlockY, params.title, {
+      fontSize: '17px',
+      color: enabled ? '#ffffff' : '#778294',
+      fontStyle: 'bold',
+    })
+    const detail = this.add.text(x + 66, textBlockY + 24, params.detail, {
+      fontSize: '15px',
+      color: enabled ? '#9fb0c8' : '#667188',
+    })
+    const objects: Phaser.GameObjects.GameObject[] = [bg, line, icon, title, detail]
+    if (params.meta) {
+      const meta = this.add.text(x + w - 12, y + h / 2 - 1, params.meta, {
+        fontSize: '14px',
+        color: enabled ? '#ffdd88' : '#778294',
+        fontStyle: 'bold',
+      }).setOrigin(1, 0.5)
+      objects.push(meta)
+    }
     parent.add(objects)
     return objects
   }
@@ -1396,60 +1501,49 @@ export class HomeScene extends Phaser.Scene {
 
   private buildResearchShop(c: Phaser.GameObjects.Container) {
     this.buildShopBackButton(c)
-    const cardW = (GAME_W - 54) / 2
     RESEARCH_ITEMS.forEach((item, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const x = 20 + cardW / 2 + col * (cardW + 14)
-      const y = CONTENT_TOP + 16 + row * 84
-      this.createResearchCard(c, item, x, y, cardW)
+      const y = CONTENT_TOP + 38 + i * 78
+      this.createResearchButton(c, item, y, i)
     })
-    this.createResearchResetCard(c, CONTENT_TOP + 16 + 3 * 84)
+    this.createResearchResetButton(c, CONTENT_TOP + 38 + RESEARCH_ITEMS.length * 78, RESEARCH_ITEMS.length)
   }
 
-  private createResearchResetCard(parent: Phaser.GameObjects.Container, y: number) {
+  private createResearchResetButton(parent: Phaser.GameObjects.Container, y: number, index: number) {
     const refund = this.calcResearchRefund()
     const canReset = refund > 0
-    this.createInfoCard(parent, {
-      x: GAME_W / 2,
+    this.createEdgeButton(parent, {
+      x: -10,
       y,
-      cardW: GAME_W - 40,
+      w: GAME_W - 20,
+      h: 66,
       icon: '↺',
-      name: '強化のやり直し',
-      description: canReset ? `研究を初期化して ${refund} CREDIT を返却` : '初期化できる研究はありません',
-      meta: canReset ? 'RESET' : 'EMPTY',
-      borderColor: canReset ? 0xcc8866 : 0x445a7a,
-      iconColor: 0xcc8866,
-      metaColor: canReset ? '#ffdd88' : '#777788',
-      selected: false,
-      onClick: canReset ? () => this.showResearchResetConfirm(refund) : undefined,
+      title: '強化のやり直し',
+      desc: canReset ? `研究を初期化して ${refund} CREDIT を返却` : '初期化できる研究はありません',
+      accent: 0xcc8866,
+      enabled: canReset,
+      slideDelay: index * UI_EDGE_BUTTON_SLIDE_STAGGER,
+      onTap: () => this.showResearchResetConfirm(refund),
     })
   }
 
-  private createResearchCard(parent: Phaser.GameObjects.Container, item: ResearchItem, x: number, y: number, cardW: number) {
+  private createResearchButton(parent: Phaser.GameObjects.Container, item: ResearchItem, y: number, index: number) {
     const level = Number(this.save.upgrades[item.id] ?? 0)
     const maxed = level >= item.maxLevel
     const cost = item.cost(level)
     const canBuy = !maxed && this.save.credits >= cost
-    const meta = maxed ? 'MAX' : 'Lv.' + level + '/' + item.maxLevel
-    this.createInfoCard(parent, {
-      x, y, cardW,
+    const state = maxed ? `Lv.${level}/${item.maxLevel} MAX` : `Lv.${level}/${item.maxLevel}  ${cost} CREDIT`
+    this.createEdgeButton(parent, {
+      x: -10,
+      y,
+      w: GAME_W - 20,
+      h: 66,
       icon: item.icon,
-      name: item.name,
-      description: item.valueText(level) + ' / ' + (maxed ? '強化済み' : item.nextText(level)),
-      meta,
-      borderColor: canBuy ? 0x44aa88 : 0x445a7a,
-      iconColor: 0x44aa88,
-      metaColor: maxed ? '#ffdd66' : '#ffffff',
-      selected: false,
-      onClick: canBuy ? () => this.showResearchConfirm(item, level, cost) : undefined,
+      title: item.name,
+      desc: `${state}　${item.valueText(level)}${maxed ? '' : ` -> ${item.nextText(level)}`}`,
+      enabled: canBuy,
+      slideDelay: index * UI_EDGE_BUTTON_SLIDE_STAGGER,
+      onTap: () => this.showResearchConfirm(item, level, cost),
     })
-    if (!maxed) {
-      const price = this.add.text(x + cardW / 2 - 10, y + 56, cost + ' CREDIT', {
-        fontSize: '11px', color: canBuy ? '#ffdd88' : '#777788', fontStyle: 'bold',
-      }).setOrigin(1, 0)
-      parent.add(price)
-    }
   }
 
   private showResearchConfirm(item: ResearchItem, level: number, cost: number) {
@@ -1511,8 +1605,8 @@ export class HomeScene extends Phaser.Scene {
     const viewBottom = GAME_H - TAB_H - 8
     const viewHeight = viewBottom - viewTop
     const enemyList = Object.values(ENEMIES)
-    const rowCount = Math.ceil(enemyList.length / 2)
-    const contentHeight = rowCount * 62 + 10
+    const rowH = 68
+    const contentHeight = enemyList.length * rowH + 8
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     let scrollY = 0
     const applyScroll = (next: number) => {
@@ -1536,19 +1630,19 @@ export class HomeScene extends Phaser.Scene {
     scrollHit.on('pointerout', () => { dragging = false })
 
     enemyList.forEach((enemy, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const cardW = (GAME_W - 54) / 2
-      const cardH = 56
-      const x = 20 + cardW / 2 + col * (cardW + 14)
-      const y = CONTENT_TOP + 16 + topOffset + row * 62
+      const x = 0
+      const y = CONTENT_TOP + 10 + topOffset + i * rowH
       const color = enemy.color ?? 0x667788
-      const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, 0x111a33, 0.58).setStrokeStyle(1, color, 0.48)
-      const iconBg = this.add.circle(x - cardW / 2 + 28, y + 22, 18, color, 0.2)
-      const icon = this.add.text(x - cardW / 2 + 28, y + 19, enemy.emoji, { fontSize: '20px' }).setOrigin(0.5)
-      const name = this.add.text(x - cardW / 2 + 52, y + 8, enemy.name, { fontSize: '15px', color: '#ffffff', fontStyle: 'bold' })
-      const stats = this.add.text(x - cardW / 2 + 52, y + 27, `HP ${enemy.hp} / SPD ${enemy.speed}`, { fontSize: '15px', color: '#88aacc' })
-      list.add([bg, iconBg, icon, name, stats])
+      this.createListRow(list, {
+        x,
+        y,
+        w: GAME_W,
+        h: rowH,
+        icon: enemy.emoji,
+        iconColor: color,
+        title: enemy.name,
+        detail: `HP ${enemy.hp}　SPD ${enemy.speed}`,
+      })
     })
 
     if (maxScroll > 0) {
