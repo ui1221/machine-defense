@@ -232,7 +232,7 @@ export class ResultScene extends Phaser.Scene {
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5)
-    back.on('pointerdown', () => this.scene.start('HomeScene'))
+    back.on('pointerdown', () => this.scene.start('HomeScene', { fromBattle: true }))
     back.on('pointerover', () => back.setFillStyle(0x3366aa))
     back.on('pointerout', () => back.setFillStyle(0x224488))
 

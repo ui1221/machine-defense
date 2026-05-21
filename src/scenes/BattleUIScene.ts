@@ -2,6 +2,26 @@ import Phaser from 'phaser'
 import { BARRICADE_Y, GAME_W } from '../constants'
 import type { BattleScene } from './BattleScene'
 import type { UpgradeOption } from '../types'
+import {
+  UI_ACTIVE_STROKE_ALPHA,
+  UI_ACTIVE_STROKE_COLOR,
+  UI_ACTIVE_STROKE_WIDTH,
+  UI_DIALOG_FILL,
+  UI_DIALOG_FILL_ALPHA,
+  UI_DIALOG_STROKE_ALPHA,
+  UI_DIALOG_STROKE_COLOR,
+  UI_DIALOG_W,
+  UI_DIALOG_X,
+  UI_EDGE_BUTTON_ACCENT,
+  UI_EDGE_BUTTON_ACCENT_ALPHA,
+  UI_EDGE_BUTTON_FILL,
+  UI_EDGE_BUTTON_FILL_ALPHA,
+  UI_EDGE_BUTTON_STROKE_ALPHA,
+  UI_EDGE_BUTTON_STROKE_WIDTH,
+  UI_RARE_ACCENT,
+  UI_RARE_FILL,
+  UI_RARE_STROKE_COLOR,
+} from '../ui/theme'
 
 export class BattleUIScene extends Phaser.Scene {
   private battle!: BattleScene
@@ -101,40 +121,69 @@ export class BattleUIScene extends Phaser.Scene {
   private showLevelUpUI(choices: UpgradeOption[]) {
     if (this.levelUpContainer) return
 
-    this.levelUpContainer = this.add.container(GAME_W / 2, 300).setDepth(200)
+    const levelUpH = 360
+    const dialogY = Math.round(300 - levelUpH / 2)
+    this.levelUpContainer = this.add.container(0, 0).setDepth(200)
 
-    const bg = this.add.rectangle(0, 0, GAME_W - 40, 340, 0x000000, 0.9)
-    const title = this.add.text(0, -140, 'LEVEL UP!', {
-      fontSize: '28px', color: '#ffdd44', fontStyle: 'bold',
+    const bg = this.add.graphics()
+    bg.fillStyle(UI_DIALOG_FILL, UI_DIALOG_FILL_ALPHA)
+    bg.fillRect(UI_DIALOG_X, dialogY, UI_DIALOG_W, levelUpH)
+    bg.lineStyle(UI_EDGE_BUTTON_STROKE_WIDTH, UI_DIALOG_STROKE_COLOR, UI_DIALOG_STROKE_ALPHA)
+    bg.strokeRect(UI_DIALOG_X, dialogY, UI_DIALOG_W, levelUpH)
+    bg.fillStyle(UI_EDGE_BUTTON_ACCENT, UI_EDGE_BUTTON_ACCENT_ALPHA)
+    bg.fillRect(UI_DIALOG_X, dialogY + 12, 4, levelUpH - 24)
+    const title = this.add.text(GAME_W / 2, dialogY + 26, 'レベルアップ', {
+      fontSize: '24px', color: '#fff0a8', fontStyle: 'bold',
     }).setOrigin(0.5)
-    const sub = this.add.text(0, -108, '強化を選択', {
-      fontSize: '16px', color: '#aaaacc',
+    const sub = this.add.text(GAME_W / 2, dialogY + 58, '強化を選択', {
+      fontSize: '16px', color: '#b8c4d8',
     }).setOrigin(0.5)
 
     this.levelUpContainer.add([bg, title, sub])
 
     choices.forEach((opt, i) => {
-      const cy = -60 + i * 85
+      const cardX = UI_DIALOG_X + 14
+      const cardY = dialogY + 88 + i * 82
       const isRare = opt.id.startsWith('rare_')
-      const card = this.add.rectangle(0, cy, GAME_W - 80, 72, isRare ? 0x302711 : 0x1a2a44)
-        .setStrokeStyle(isRare ? 3 : 2, isRare ? 0xffd34d : 0x446688)
+      const cardW = UI_DIALOG_W - 28
+      const cardH = 74
+      const accent = isRare ? UI_RARE_ACCENT : UI_EDGE_BUTTON_ACCENT
+      const fill = isRare ? UI_RARE_FILL : UI_EDGE_BUTTON_FILL
+      const card = this.add.graphics()
+      const drawCard = (pressed: boolean) => {
+        card.clear()
+        card.fillStyle(fill, isRare ? 0.92 : UI_EDGE_BUTTON_FILL_ALPHA)
+        card.fillRect(cardX, cardY, cardW, cardH)
+        card.lineStyle(
+          pressed ? UI_ACTIVE_STROKE_WIDTH : UI_EDGE_BUTTON_STROKE_WIDTH,
+          pressed ? UI_ACTIVE_STROKE_COLOR : isRare ? UI_RARE_STROKE_COLOR : accent,
+          pressed ? UI_ACTIVE_STROKE_ALPHA : isRare ? 0.9 : UI_EDGE_BUTTON_STROKE_ALPHA,
+        )
+        card.strokeRect(cardX, cardY, cardW, cardH)
+        card.fillStyle(accent, isRare ? 0.5 : UI_EDGE_BUTTON_ACCENT_ALPHA)
+        card.fillRect(cardX, cardY + 10, 4, cardH - 20)
+      }
+      drawCard(false)
+      const hit = this.add.rectangle(cardX + cardW / 2, cardY + cardH / 2, cardW, cardH, 0x000000, 0.001)
         .setInteractive({ useHandCursor: true })
 
-      const emoji = this.add.text(-160, cy, opt.emoji, { fontSize: '32px' }).setOrigin(0.5)
-      const name = this.add.text(-120, cy - 12, opt.name, {
-        fontSize: '18px', color: '#ffffff', fontStyle: 'bold',
+      const emoji = this.add.text(cardX + 48, cardY + cardH / 2, opt.emoji, { fontSize: '30px' }).setOrigin(0.5)
+      const name = this.add.text(cardX + 88, cardY + 10, opt.name, {
+        fontSize: '20px', color: isRare ? '#ffef9a' : '#ffffff', fontStyle: 'bold',
       })
-      const desc = this.add.text(-120, cy + 12, opt.description, {
-        fontSize: '15px', color: '#8899aa',
+      const desc = this.add.text(cardX + 88, cardY + 37, opt.description, {
+        fontSize: '15px', color: '#9fb0c8',
+        wordWrap: { width: cardW - 104, useAdvancedWrap: true },
       })
 
-      card.on('pointerdown', () => {
+      hit.on('pointerdown', () => drawCard(true))
+      hit.on('pointerup', () => {
+        drawCard(false)
         this.battle.applyUpgrade(opt.id)
       })
-      card.on('pointerover', () => card.setFillStyle(isRare ? 0x46391a : 0x2a3a66))
-      card.on('pointerout', () => card.setFillStyle(isRare ? 0x302711 : 0x1a2a44))
+      hit.on('pointerout', () => drawCard(false))
 
-      this.levelUpContainer!.add([card, emoji, name, desc])
+      this.levelUpContainer!.add([card, hit, emoji, name, desc])
     })
   }
 

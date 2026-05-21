@@ -13,6 +13,7 @@ export class BeamZone extends Phaser.GameObjects.Rectangle {
   private readonly angleRad: number
   private readonly halfLength: number
   private readonly halfWidth: number
+  private readonly beamVisual: Phaser.GameObjects.Graphics
 
   constructor(
     scene: Phaser.Scene,
@@ -24,8 +25,7 @@ export class BeamZone extends Phaser.GameObjects.Rectangle {
     damagePerTick: number,
     ownerId: string,
   ) {
-    super(scene, x, y, length, width, 0x66ddff, 0.2)
-    this.setStrokeStyle(2, 0xaaf2ff, 0.9)
+    super(scene, x, y, length, width, 0x66ddff, 0)
     this.setRotation(angleRad)
     this.setDepth(11)
     this.ownerId = ownerId
@@ -33,6 +33,50 @@ export class BeamZone extends Phaser.GameObjects.Rectangle {
     this.angleRad = angleRad
     this.halfLength = length / 2
     this.halfWidth = width / 2
+    this.beamVisual = scene.add.graphics().setDepth(12)
+    this.drawBeamVisual(length, width)
+  }
+
+  private drawBeamVisual(length: number, width: number) {
+    const rootX = this.x - Math.cos(this.angleRad) * this.halfLength
+    const rootY = this.y - Math.sin(this.angleRad) * this.halfLength
+    const forwardX = Math.cos(this.angleRad)
+    const forwardY = Math.sin(this.angleRad)
+    const sideX = -Math.sin(this.angleRad)
+    const sideY = Math.cos(this.angleRad)
+    const taperLen = Math.max(56, width * 1.7)
+    const bodyHalf = width / 2
+    const flareHalf = bodyHalf * 1.45
+
+    const rootTipX = rootX
+    const rootTipY = rootY
+    const flareLeftX = rootX + forwardX * taperLen + sideX * flareHalf
+    const flareLeftY = rootY + forwardY * taperLen + sideY * flareHalf
+    const endLeftX = rootX + forwardX * length + sideX * bodyHalf
+    const endLeftY = rootY + forwardY * length + sideY * bodyHalf
+    const endRightX = rootX + forwardX * length - sideX * bodyHalf
+    const endRightY = rootY + forwardY * length - sideY * bodyHalf
+    const flareRightX = rootX + forwardX * taperLen - sideX * flareHalf
+    const flareRightY = rootY + forwardY * taperLen - sideY * flareHalf
+
+    this.beamVisual.clear()
+    this.beamVisual.fillStyle(0x66ddff, 0.22)
+    this.beamVisual.lineStyle(2, 0xc8fbff, 0.82)
+    this.beamVisual.beginPath()
+    this.beamVisual.moveTo(rootTipX, rootTipY)
+    this.beamVisual.lineTo(flareLeftX, flareLeftY)
+    this.beamVisual.lineTo(endLeftX, endLeftY)
+    this.beamVisual.lineTo(endRightX, endRightY)
+    this.beamVisual.lineTo(flareRightX, flareRightY)
+    this.beamVisual.closePath()
+    this.beamVisual.fillPath()
+    this.beamVisual.strokePath()
+
+    this.beamVisual.lineStyle(1, 0xffffff, 0.36)
+    this.beamVisual.beginPath()
+    this.beamVisual.moveTo(rootTipX, rootTipY)
+    this.beamVisual.lineTo(rootX + forwardX * length, rootY + forwardY * length)
+    this.beamVisual.strokePath()
   }
 
   containsEnemy(enemy: Enemy) {
@@ -56,7 +100,12 @@ export class BeamZone extends Phaser.GameObjects.Rectangle {
       this.shouldTick = true
     }
     const remaining = DURATION - this.elapsed
-    if (remaining < 420) this.setAlpha(0.2 * (remaining / 420))
+    if (remaining < 420) this.beamVisual.setAlpha(remaining / 420)
     if (this.expired) this.destroy()
+  }
+
+  destroy(fromScene?: boolean) {
+    this.beamVisual.destroy()
+    super.destroy(fromScene)
   }
 }
