@@ -25,3 +25,13 @@ export const UI_DIALOG_STROKE_ALPHA = 0.42
 export const UI_RARE_STROKE_COLOR = 0xffdd66
 export const UI_RARE_FILL = 0x221b0b
 export const UI_RARE_ACCENT = 0xffdd66
+
+export const UI_LIST_ROW_H = 68
+export const UI_LIST_ROW_FILL_ALPHA = 0.58
+export const UI_LIST_ROW_DISABLED_FILL_ALPHA = 0.28
+export const UI_LIST_ROW_PRESSED_FILL_ALPHA = 0.74
+export const UI_LIST_ROW_LINE_COLOR = 0x8aa0bb
+export const UI_LIST_ROW_LINE_ALPHA = 0.18
+export const UI_LIST_ROW_DISABLED_LINE_ALPHA = 0.08
+export const UI_LIST_ROW_ICON_X = 34
+export const UI_LIST_ROW_TEXT_X = 66

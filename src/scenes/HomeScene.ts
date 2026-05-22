@@ -27,6 +27,15 @@ import {
   UI_EDGE_BUTTON_SLIDE_STAGGER,
   UI_EDGE_BUTTON_STROKE_ALPHA,
   UI_EDGE_BUTTON_STROKE_WIDTH,
+  UI_LIST_ROW_DISABLED_FILL_ALPHA,
+  UI_LIST_ROW_DISABLED_LINE_ALPHA,
+  UI_LIST_ROW_FILL_ALPHA,
+  UI_LIST_ROW_H,
+  UI_LIST_ROW_ICON_X,
+  UI_LIST_ROW_LINE_ALPHA,
+  UI_LIST_ROW_LINE_COLOR,
+  UI_LIST_ROW_PRESSED_FILL_ALPHA,
+  UI_LIST_ROW_TEXT_X,
 } from '../ui/theme'
 
 const TAB_H = 72
@@ -43,6 +52,7 @@ const STANDEE_DISPLAY_H = 670
 const EQUIPMENT_SLOT_ORDER: EquipmentSlot[] = ['weapon', 'core', 'sensor', 'module']
 type ShopMode = 'menu' | 'buy' | 'sell' | 'upgrade' | 'research'
 type FileMode = 'items' | 'enemies'
+type StandeeObject = Phaser.GameObjects.Container | Phaser.GameObjects.Text
 
 export class HomeScene extends Phaser.Scene {
   private save!: GameSave
@@ -57,7 +67,7 @@ export class HomeScene extends Phaser.Scene {
   private topShellObjects: Phaser.GameObjects.GameObject[] = []
   private bottomShellObjects: Phaser.GameObjects.GameObject[] = []
   private hubHomeContainer?: Phaser.GameObjects.Container
-  private lobbyPortrait?: Phaser.GameObjects.Image | Phaser.GameObjects.Text
+  private lobbyPortrait?: StandeeObject
   private backButtonContainer?: Phaser.GameObjects.Container
   private creditText?: Phaser.GameObjects.Text
   private lobbyMessageContainer?: Phaser.GameObjects.Container
@@ -442,7 +452,7 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  private playLobbyReturnAnimation(portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Text) {
+  private playLobbyReturnAnimation(portrait: StandeeObject) {
     this.slideObjects(this.topShellObjects, -120, 360, 0)
     this.slideObjects(this.bottomShellObjects, 130, 420, 0)
 
@@ -462,16 +472,33 @@ export class HomeScene extends Phaser.Scene {
   private addCharacterStandee(charId: string) {
     const cfg = CHARACTERS[charId] ?? CHARACTERS.assault
     if (cfg.id === 'assault') {
-      const portrait = this.add.image(STANDEE_X, STANDEE_TOP_Y, 'home_portrait')
+      const group = this.add.container(STANDEE_X, STANDEE_TOP_Y)
+      const shadow = this.add.image(14, 10, 'home_portrait')
+        .setOrigin(0.5, 0)
+        .setTintFill(this.characterAccentColor(cfg.id))
+        .setAlpha(0.42)
+      shadow.displayHeight = STANDEE_DISPLAY_H
+      shadow.scaleX = shadow.scaleY
+      const portrait = this.add.image(0, 0, 'home_portrait')
         .setOrigin(0.5, 0)
       portrait.displayHeight = STANDEE_DISPLAY_H
       portrait.scaleX = portrait.scaleY
-      return portrait
+      group.add([shadow, portrait])
+      group.setSize(portrait.displayWidth + 32, portrait.displayHeight)
+      return group
     }
 
-    return this.add.text(STANDEE_X, STANDEE_TOP_Y + 180, cfg.emoji, {
+    const group = this.add.container(STANDEE_X, STANDEE_TOP_Y + 180)
+    const shadow = this.add.text(14, 8, cfg.emoji, {
+      fontSize: '104px',
+      color: this.hexColor(this.characterAccentColor(cfg.id)),
+    }).setOrigin(0.5).setAlpha(0.42)
+    const body = this.add.text(0, 0, cfg.emoji, {
       fontSize: '104px',
     }).setOrigin(0.5)
+    group.add([shadow, body])
+    group.setSize(128, 128)
+    return group
   }
 
   private slideObjects(objects: Phaser.GameObjects.GameObject[], offsetY: number, duration: number, delay: number) {
@@ -489,7 +516,7 @@ export class HomeScene extends Phaser.Scene {
     })
   }
 
-  private slidePortraitIn(target: Phaser.GameObjects.Image | Phaser.GameObjects.Text) {
+  private slidePortraitIn(target: StandeeObject) {
     this.slideObjectInFromRight(target)
   }
 
@@ -595,8 +622,8 @@ export class HomeScene extends Phaser.Scene {
     const viewTop = CONTENT_TOP
     const viewBottom = GAME_H - TAB_H - 14
     const viewHeight = viewBottom - viewTop
-    const cardH = 78
-    const rowH = 96
+    const cardH = UI_LIST_ROW_H
+    const rowH = UI_LIST_ROW_H
     const contentHeight = Math.max(viewHeight, STAGES.length * rowH + 8)
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     const lastPlayedIndex = Math.max(0, STAGES.findIndex(stage => stage.id === this.save.lastPlayedStageId))
@@ -613,41 +640,29 @@ export class HomeScene extends Phaser.Scene {
     }
 
     STAGES.forEach((stage, i) => {
-      const y = viewTop + 6 + i * rowH
+      const y = viewTop + 4 + i * rowH
       const cleared = this.save.clearedStages.includes(stage.id)
       const unlocked = this.isStageUnlocked(i)
       const lastPlayed = this.save.lastPlayedStageId === stage.id
-      const bgColor = lastPlayed ? 0x243055 : unlocked ? 0x1a2244 : 0x111827
-      const strokeColor = lastPlayed ? UI_ACTIVE_STROKE_COLOR : cleared ? 0x44ff88 : unlocked ? 0x334466 : 0x333344
-      const bg = this.add.rectangle(GAME_W / 2, y + 30, GAME_W - 40, 78, bgColor, lastPlayed ? 0.78 : 0.58)
-        .setStrokeStyle(lastPlayed ? UI_ACTIVE_STROKE_WIDTH : 1, strokeColor, lastPlayed ? UI_ACTIVE_STROKE_ALPHA : 0.52)
-      if (unlocked) bg.setInteractive({ useHandCursor: true })
-
-      const prefix = cleared ? '✓ ' : unlocked ? '' : 'LOCK '
-      const name = this.add.text(40, y + 10, `${prefix}${stage.name}`, {
-        fontSize: '20px', color: unlocked ? '#ffffff' : '#666677',
-      })
-      const desc = this.add.text(40, y + 36, stage.description, {
-        fontSize: '15px', color: unlocked ? '#888899' : '#555566',
-      })
-      const mult = this.add.text(GAME_W - 40, y + 10, `HP x${(stage.enemyHpMult ?? 1).toFixed(2)}`, {
-        fontSize: '14px', color: unlocked ? '#ffdd88' : '#555566',
-      }).setOrigin(1, 0)
-      const last = lastPlayed
-        ? this.add.text(GAME_W - 40, y + 54, '前回', {
-            fontSize: '13px', color: '#ffdd66', fontStyle: 'bold',
-          }).setOrigin(1, 0)
-        : null
-
-      if (unlocked) {
-        this.bindTapOnly(bg, () => {
+      const meta = lastPlayed ? `前回  HP x${(stage.enemyHpMult ?? 1).toFixed(2)}` : `HP x${(stage.enemyHpMult ?? 1).toFixed(2)}`
+      this.createListRow(list, {
+        x: 0,
+        y,
+        w: GAME_W,
+        h: rowH,
+        icon: cleared ? '✓' : unlocked ? '>' : '×',
+        iconColor: cleared ? 0x44ff88 : unlocked ? UI_EDGE_BUTTON_ACCENT : 0x667188,
+        title: stage.name,
+        detail: stage.description,
+        meta,
+        enabled: unlocked,
+        selected: lastPlayed,
+        onDragDelta: delta => applyScroll(scrollY + delta),
+        onClick: unlocked ? () => {
           markStagePlayed(stage.id)
           this.scene.start('BattleScene', { stageId: stage.id })
-        })
-        bg.on('pointerover', () => bg.setFillStyle(0x2a3366))
-        bg.on('pointerout', () => bg.setFillStyle(bgColor))
-      }
-      list.add(last ? [bg, name, desc, mult, last] : [bg, name, desc, mult])
+        } : undefined,
+      })
     })
     applyScroll(scrollY)
     this.bindPanelScroll(c, GAME_W / 2, (viewTop + viewBottom) / 2, GAME_W, viewHeight, delta => applyScroll(scrollY + delta))
@@ -701,18 +716,25 @@ export class HomeScene extends Phaser.Scene {
     this.slideObjectInFromRight(standee)
     const panelX = 36
     const infoTop = CONTENT_TOP + 72
-    const name = this.add.text(panelX, infoTop, cfg.name, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
-    const desc = this.add.text(panelX, infoTop + 32, cfg.description, {
-      fontSize: '14px', color: '#9fb0c8', wordWrap: { width: 245, useAdvancedWrap: true },
+    const accentBar = this.add.rectangle(
+      24,
+      infoTop - 14 + 178 / 2,
+      5,
+      178,
+      this.characterAccentColor(cfg.id),
+      0.9,
+    )
+    const infoPanel = this.createCharacterInfoPanel(panelX, infoTop - 14, {
+      characterId: cfg.id,
+      name: cfg.name,
+      description: cfg.description,
+      level: `Lv.${level}/${levelCap}`,
+      stats: [
+      { label: '攻撃', value: currentAtk.toFixed(1), bonus: this.formatStatBonus(atkEquipBonus, 1) },
+      { label: '冷却', value: `${(cooldownNow / 1000).toFixed(2)}秒`, bonus: `${this.formatStatBonus(cooldownEquipBonus / 1000, 2)}秒` },
+      { label: '会心', value: `${currentCrit.toFixed(2)}%`, bonus: `${this.formatStatBonus(critEquipBonus, 2)}%` },
+      ],
     })
-    const levelTitle = this.add.text(panelX, infoTop + 86, `Lv.${level}/${levelCap}`, {
-      fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
-    })
-    const stats = this.add.text(panelX, infoTop + 116, [
-      `攻撃: ${currentAtk.toFixed(1)}${this.formatSigned(atkEquipBonus, 1)}`,
-      `冷却: ${(cooldownNow / 1000).toFixed(2)}秒${this.formatSigned(cooldownEquipBonus / 1000, 2)}秒`,
-      `会心: ${currentCrit.toFixed(2)}%${this.formatSigned(critEquipBonus, 2)}%`,
-    ].join('\n'), { fontSize: '14px', color: '#d8e6ff', lineSpacing: 7 })
 
     const slotObjects: Phaser.GameObjects.GameObject[] = []
     const actionButtonX = -10
@@ -769,14 +791,79 @@ export class HomeScene extends Phaser.Scene {
       upgradeBtn.setVisible(false)
     }
     c.add(isSelectingEquipment
-      ? [name, desc, levelTitle, stats, ...slotObjects]
-      : [...portraitObjects, name, desc, levelTitle, stats, ...slotObjects, upgradeBtn])
+      ? [accentBar, infoPanel, ...slotObjects]
+      : [accentBar, infoPanel, ...portraitObjects, ...slotObjects, upgradeBtn])
     if (!isSelectingEquipment) c.bringToTop(upgradeBtn)
     slotObjects.forEach(obj => c.bringToTop(obj))
 
     if (isSelectingEquipment) this.buildCharacterEquipList(c, cfg.id)
     this.buildCharacterSelector(c, cfg.id)
     return c
+  }
+
+  private createCharacterInfoPanel(
+    x: number,
+    y: number,
+    params: {
+      characterId: string
+      name: string
+      description: string
+      level: string
+      stats: Array<{ label: string; value: string; bonus: string }>
+    },
+  ) {
+    const c = this.add.container(0, 0)
+    const sheetH = 178
+    const sheet = this.add.rectangle(GAME_W / 2, y + sheetH / 2, GAME_W, sheetH, UI_EDGE_BUTTON_FILL, UI_EDGE_BUTTON_FILL_ALPHA)
+    const name = this.add.text(x, y + 14, params.name, {
+      fontSize: '22px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    }).setShadow(0, 2, '#000000', 4, true, true)
+    const level = this.add.text(x + 154, y + 14, params.level, {
+      fontSize: '22px',
+      color: '#ffdd88',
+      fontStyle: 'bold',
+    }).setShadow(0, 2, '#000000', 4, true, true)
+    const desc = this.add.text(x, y + 52, params.description, {
+      fontSize: '15px',
+      color: '#c5d3e8',
+      wordWrap: { width: GAME_W - x * 2, useAdvancedWrap: true },
+      lineSpacing: 2,
+    }).setShadow(0, 2, '#000000', 4, true, true)
+    c.add([sheet, name, desc, level])
+
+    params.stats.forEach((row, i) => {
+      const rowY = y + 96 + i * 22
+      const label = this.add.text(x, rowY, row.label, {
+        fontSize: '17px',
+        color: '#d8e6ff',
+        fontStyle: 'bold',
+      }).setShadow(0, 2, '#000000', 4, true, true)
+      const value = this.add.text(x + 76, rowY, row.value, {
+        fontSize: '17px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      }).setShadow(0, 2, '#000000', 4, true, true)
+      const bonus = this.add.text(x + 164, rowY, row.bonus, {
+        fontSize: '17px',
+        color: '#8fffb6',
+        fontStyle: 'bold',
+      }).setShadow(0, 2, '#000000', 4, true, true)
+      c.add([label, value, bonus])
+    })
+    return c
+  }
+
+  private characterAccentColor(charId: string) {
+    if (charId === 'assault') return 0xffee00
+    if (charId === 'blade') return 0x55aaff
+    if (charId === 'orb') return 0x9b6dff
+    if (charId === 'railgun') return 0xff6688
+    if (charId === 'field') return 0x66dd88
+    if (charId === 'beam') return 0x77e6ff
+    if (charId === 'stun') return 0xffffff
+    return 0xffdd66
   }
 
   private buildCharacterSelector(c: Phaser.GameObjects.Container, selectedId: string) {
@@ -829,24 +916,33 @@ export class HomeScene extends Phaser.Scene {
     list.setMask(mask)
     c.add(maskShape)
 
-    const back = this.add.text(panelX + 14, panelY + 12, '<', {
+    const backHit = this.add.rectangle(panelX + 48, panelY + 21, 96, 38, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: true })
+    const back = this.add.text(panelX + 14, panelY + 12, '< 戻る', {
       fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
-    }).setInteractive({ useHandCursor: true })
+    })
     const title = this.add.text(panelX + panelW / 2, panelY + 13, `${equipmentSlotLabel(slot)}を選択`, {
       fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5, 0)
-    back.on('pointerdown', () => {
+    backHit.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
+    })
+    backHit.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
       this.selectingEquipmentForCharId = null
       this.selectingEquipmentSlot = null
       this.rebuildPanel(1, this.buildCharPanel())
       this.panels[1].setVisible(true)
     })
-    c.add([back, title])
+    c.add([backHit, back, title])
     if (current) {
       const remove = this.add.text(panelX + panelW - 16, panelY + 13, '外す', {
         fontSize: '15px', color: '#ffb0a0', fontStyle: 'bold',
       }).setOrigin(1, 0).setInteractive({ useHandCursor: true })
-      remove.on('pointerdown', () => this.unequipCharacterWeapon(charId, slot))
+      remove.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+        event.stopPropagation()
+        this.unequipCharacterWeapon(charId, slot)
+      })
       c.add(remove)
     }
 
@@ -861,6 +957,9 @@ export class HomeScene extends Phaser.Scene {
         fontSize: '13px', color: '#667788', align: 'center', lineSpacing: 4,
       }).setOrigin(0.5)
       list.add(none)
+      c.bringToTop(backHit)
+      c.bringToTop(back)
+      c.bringToTop(title)
       return
     }
 
@@ -891,6 +990,9 @@ export class HomeScene extends Phaser.Scene {
         fontSize: '13px', color: '#7d8ca3',
       }).setOrigin(0.5).setDepth(46))
     }
+    c.bringToTop(backHit)
+    c.bringToTop(back)
+    c.bringToTop(title)
   }
 
   private createSelectionPanel(parent: Phaser.GameObjects.Container, x: number, y: number, w: number, h: number) {
@@ -960,104 +1062,6 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  private createItemCard(
-    parent: Phaser.GameObjects.Container,
-    owned: OwnedWeapon,
-    x: number,
-    y: number,
-    cardW: number,
-    options: { selected?: boolean; showEquippedTo?: boolean; onClick?: () => void; onDragDelta?: (delta: number) => void } = {},
-  ) {
-    const weapon = WEAPONS[owned.weaponId]
-    if (!weapon) return
-    const slotColor = this.equipmentSlotColor(weapon.slot)
-    const objects = this.createInfoCard(parent, {
-      x, y, cardW,
-      icon: weapon.emoji,
-      name: this.equipmentDisplayName(weapon.name, owned.level),
-      description: weapon.description,
-      meta: weapon.rarity,
-      borderColor: slotColor,
-      iconColor: slotColor,
-      metaColor: this.rarityTextColor(weapon.rarity),
-      selected: options.selected,
-      onClick: options.onClick,
-      onDragDelta: options.onDragDelta,
-    })
-    if (options.showEquippedTo && owned.equippedCharId && !options.selected) {
-      const equippedTo = CHARACTERS[owned.equippedCharId]?.name ?? owned.equippedCharId
-      objects.push(this.add.text(x + cardW / 2 - 10, y + 56, equippedTo, {
-        fontSize: '11px', color: '#66ccff',
-      }).setOrigin(1, 0))
-      parent.add(objects[objects.length - 1])
-    }
-  }
-
-  private createInfoCard(
-    parent: Phaser.GameObjects.Container,
-    params: {
-      x: number
-      y: number
-      cardW: number
-      icon: string
-      name: string
-      description: string
-      meta: string
-      borderColor: number
-      iconColor: number
-      metaColor: string
-      selected?: boolean
-      onClick?: () => void
-      onDragDelta?: (delta: number) => void
-    },
-  ) {
-    const { x, y, cardW } = params
-    const cardH = 76
-    const bg = this.add.rectangle(x, y + cardH / 2, cardW, cardH, params.selected ? 0x1e3150 : UI_EDGE_BUTTON_FILL, params.selected ? 0.88 : 0.66)
-      .setStrokeStyle(
-        params.selected ? UI_ACTIVE_STROKE_WIDTH : UI_EDGE_BUTTON_STROKE_WIDTH,
-        params.selected ? UI_ACTIVE_STROKE_COLOR : params.borderColor,
-        params.selected ? UI_ACTIVE_STROKE_ALPHA : 0.54,
-      )
-    if (params.onClick || params.onDragDelta) {
-      let downY = 0
-      let moved = 0
-      let pressed = false
-      bg.setInteractive({ useHandCursor: !!params.onClick })
-      bg.on('pointerdown', (p: Phaser.Input.Pointer) => {
-        downY = p.y
-        moved = 0
-        pressed = true
-      })
-      bg.on('pointermove', (p: Phaser.Input.Pointer) => {
-        if (!pressed || !p.isDown || !params.onDragDelta) return
-        const delta = downY - p.y
-        moved += Math.abs(delta)
-        downY = p.y
-        params.onDragDelta(delta)
-      })
-      bg.on('pointerup', () => {
-        if (pressed && moved < 8) params.onClick?.()
-        pressed = false
-      })
-      bg.on('pointerout', () => { pressed = false })
-    }
-    const iconBg = this.add.circle(x - cardW / 2 + 30, y + 27, 18, params.iconColor, 0.2)
-    const icon = this.add.text(x - cardW / 2 + 30, y + 24, params.icon, { fontSize: '18px' }).setOrigin(0.5)
-    const name = this.add.text(x - cardW / 2 + 52, y + 10, params.name, {
-      fontSize: '15px', color: '#ffffff', fontStyle: params.selected ? 'bold' : '', wordWrap: { width: cardW - 70 },
-    })
-    const effect = this.add.text(x - cardW / 2 + 52, y + 31, params.description, {
-      fontSize: '13px', color: '#9fb0c8', wordWrap: { width: cardW - 70 },
-    })
-    const meta = this.add.text(x + cardW / 2 - 10, y + 10, params.meta, {
-      fontSize: '12px', color: params.metaColor, fontStyle: 'bold',
-    }).setOrigin(1, 0)
-    const objects: Phaser.GameObjects.GameObject[] = [bg, iconBg, icon, name, effect, meta]
-    parent.add(objects)
-    return objects
-  }
-
   private createListRow(
     parent: Phaser.GameObjects.Container,
     params: {
@@ -1070,15 +1074,33 @@ export class HomeScene extends Phaser.Scene {
       title: string
       detail: string
       meta?: string
+      metaColor?: string
       enabled?: boolean
+      selected?: boolean
       onClick?: () => void
       onDragDelta?: (delta: number) => void
     },
   ) {
     const { x, y, w, h } = params
     const enabled = params.enabled ?? true
-    const bg = this.add.rectangle(x + w / 2, y + h / 2, w, h, UI_EDGE_BUTTON_FILL, enabled ? 0.36 : 0.18)
-    const line = this.add.rectangle(x + w / 2, y + h - 1, w - 24, 1, 0x8aa0bb, enabled ? 0.18 : 0.08)
+    const selected = params.selected ?? false
+    const bg = this.add.rectangle(
+      x + w / 2,
+      y + h / 2,
+      w,
+      h,
+      UI_EDGE_BUTTON_FILL,
+      enabled ? UI_LIST_ROW_FILL_ALPHA : UI_LIST_ROW_DISABLED_FILL_ALPHA,
+    )
+    if (selected) bg.setStrokeStyle(UI_ACTIVE_STROKE_WIDTH, UI_ACTIVE_STROKE_COLOR, UI_ACTIVE_STROKE_ALPHA)
+    const line = this.add.rectangle(
+      x + w / 2,
+      y + h - 1,
+      w - 24,
+      1,
+      UI_LIST_ROW_LINE_COLOR,
+      enabled ? UI_LIST_ROW_LINE_ALPHA : UI_LIST_ROW_DISABLED_LINE_ALPHA,
+    )
     if (enabled && (params.onClick || params.onDragDelta)) {
       let downY = 0
       let moved = 0
@@ -1088,7 +1110,7 @@ export class HomeScene extends Phaser.Scene {
         downY = p.y
         moved = 0
         pressed = true
-        bg.setFillStyle(0x132137, 0.58)
+        bg.setFillStyle(0x132137, UI_LIST_ROW_PRESSED_FILL_ALPHA)
       })
       bg.on('pointermove', (p: Phaser.Input.Pointer) => {
         if (!pressed || !p.isDown || !params.onDragDelta) return
@@ -1100,25 +1122,25 @@ export class HomeScene extends Phaser.Scene {
       bg.on('pointerup', () => {
         if (pressed && moved < 8) params.onClick?.()
         pressed = false
-        bg.setFillStyle(UI_EDGE_BUTTON_FILL, 0.36)
+        bg.setFillStyle(UI_EDGE_BUTTON_FILL, UI_LIST_ROW_FILL_ALPHA)
       })
       bg.on('pointerout', () => {
         pressed = false
-        bg.setFillStyle(UI_EDGE_BUTTON_FILL, 0.36)
+        bg.setFillStyle(UI_EDGE_BUTTON_FILL, UI_LIST_ROW_FILL_ALPHA)
       })
     }
-    const icon = this.add.text(x + 34, y + h / 2 - 2, params.icon, {
+    const icon = this.add.text(x + UI_LIST_ROW_ICON_X, y + h / 2 - 2, params.icon, {
       fontSize: '19px',
-      color: enabled ? '#ffffff' : '#667188',
+      color: enabled ? this.hexColor(params.iconColor) : '#667188',
       fontStyle: 'bold',
     }).setOrigin(0.5)
     const textBlockY = y + h / 2 - 19
-    const title = this.add.text(x + 66, textBlockY, params.title, {
+    const title = this.add.text(x + UI_LIST_ROW_TEXT_X, textBlockY, params.title, {
       fontSize: '17px',
       color: enabled ? '#ffffff' : '#778294',
       fontStyle: 'bold',
     })
-    const detail = this.add.text(x + 66, textBlockY + 24, params.detail, {
+    const detail = this.add.text(x + UI_LIST_ROW_TEXT_X, textBlockY + 24, params.detail, {
       fontSize: '15px',
       color: enabled ? '#9fb0c8' : '#667188',
     })
@@ -1126,7 +1148,7 @@ export class HomeScene extends Phaser.Scene {
     if (params.meta) {
       const meta = this.add.text(x + w - 12, y + h / 2 - 1, params.meta, {
         fontSize: '14px',
-        color: enabled ? '#ffdd88' : '#778294',
+        color: enabled ? params.metaColor ?? '#ffdd88' : '#778294',
         fontStyle: 'bold',
       }).setOrigin(1, 0.5)
       objects.push(meta)
@@ -1200,8 +1222,7 @@ export class HomeScene extends Phaser.Scene {
     return 0xe8edf5
   }
 
-  private rarityTextColor(rarity: string) {
-    const color = RARITY_COLORS[rarity as keyof typeof RARITY_COLORS] ?? 0xffffff
+  private hexColor(color: number) {
     return '#' + color.toString(16).padStart(6, '0')
   }
 
@@ -1230,6 +1251,14 @@ export class HomeScene extends Phaser.Scene {
     return Math.max(1, Math.round(rarityBase * slotMult * (1 + owned.level * 0.25)))
   }
 
+  private buyPrice(weaponId: string) {
+    const weapon = WEAPONS[weaponId]
+    if (!weapon) return 0
+    const rarityBase = weapon.rarity === 'N' ? 180 : weapon.rarity === 'R' ? 1400 : weapon.rarity === 'SR' ? 9000 : 30000
+    const slotMult = weapon.slot === 'core' ? 1.1 : weapon.slot === 'module' ? 0.9 : 1
+    return Math.max(1, Math.round(rarityBase * slotMult))
+  }
+
   private equipmentStatBonus(charId: string) {
     const result = { atkMult: 1, atkSpeedMult: 1, critAdd: 0 }
     const equipmentBonus = 1 + this.save.upgrades.equipmentLevel * 0.03
@@ -1247,9 +1276,9 @@ export class HomeScene extends Phaser.Scene {
     return result
   }
 
-  private formatSigned(value: number, digits: number) {
+  private formatStatBonus(value: number, digits: number) {
     if (Math.abs(value) < 0.005) return ''
-    return value > 0 ? ` +${value.toFixed(digits)}` : ` -${Math.abs(value).toFixed(digits)}`
+    return value > 0 ? `+${value.toFixed(digits)}` : `-${Math.abs(value).toFixed(digits)}`
   }
 
   private equipmentDisplayName(name: string, level: number) {
@@ -1312,6 +1341,7 @@ export class HomeScene extends Phaser.Scene {
     this.save = this.loadSave()
     if (this.shopMode !== 'research') this.buildShopKeeper(c)
     if (this.shopMode === 'menu') this.buildShopMenu(c)
+    else if (this.shopMode === 'buy') this.buildBuyShop(c)
     else if (this.shopMode === 'sell') this.buildSellShop(c)
     else if (this.shopMode === 'research') this.buildResearchShop(c)
     else this.buildShopPlaceholder(c)
@@ -1442,6 +1472,26 @@ export class HomeScene extends Phaser.Scene {
     c.add(back)
   }
 
+  private addShopSelectionHeader(c: Phaser.GameObjects.Container, panelX: number, panelY: number, panelW: number, titleText: string) {
+    const backHit = this.add.rectangle(panelX + 48, panelY + 21, 96, 38, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: true })
+    const back = this.add.text(panelX + 14, panelY + 12, '< 戻る', {
+      fontSize: '18px', color: '#ffdd88', fontStyle: 'bold',
+    })
+    const title = this.add.text(panelX + panelW / 2, panelY + 13, titleText, {
+      fontSize: '17px', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5, 0)
+    const goBack = (event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
+      this.shopMode = 'menu'
+      this.rebuildPanel(3, this.buildShopPanel())
+      this.panels[3].setVisible(true)
+    }
+    backHit.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => event.stopPropagation())
+    backHit.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => goBack(event))
+    c.add([backHit, back, title])
+  }
+
   private buildShopPlaceholder(c: Phaser.GameObjects.Container) {
     this.buildShopBackButton(c)
     c.add(this.add.text(160, CONTENT_TOP + 120, '\u3053\u306e\u9805\u76ee\u306f\u6b21\u306b\u5b9f\u88c5\u3057\u307e\u3059\u3002', {
@@ -1449,25 +1499,91 @@ export class HomeScene extends Phaser.Scene {
     }).setOrigin(0.5))
   }
 
+  private buildBuyShop(c: Phaser.GameObjects.Container) {
+    const items = Object.values(WEAPONS)
+      .filter(weapon => weapon.rarity === 'N')
+      .sort((a, b) => {
+        const slotOrder: Record<EquipmentSlot, number> = { weapon: 0, core: 1, sensor: 2, module: 3 }
+        const slotDiff = slotOrder[a.slot] - slotOrder[b.slot]
+        return slotDiff !== 0 ? slotDiff : a.name.localeCompare(b.name, 'ja')
+      })
+
+    const panelX = 0
+    const panelY = CONTENT_TOP + 38
+    const panelW = GAME_W
+    const panelH = GAME_H - TAB_H - panelY - 8
+    const viewTop = panelY + 42
+    const viewBottom = GAME_H - TAB_H - 18
+    const viewHeight = viewBottom - viewTop
+    const rowH = UI_LIST_ROW_H
+    const contentHeight = Math.max(viewHeight, items.length * rowH + 8)
+    const maxScroll = Math.max(0, contentHeight - viewHeight)
+    let scrollY = 0
+
+    this.createSelectionPanel(c, panelX, panelY, panelW, panelH)
+    const list = this.add.container(0, 0)
+    c.add(list)
+
+    const applyScroll = (next: number) => {
+      scrollY = Phaser.Math.Clamp(next, 0, maxScroll)
+      list.y = -scrollY
+    }
+
+    const maskShape = this.add.rectangle(panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, 0xffffff)
+    maskShape.setVisible(false)
+    list.setMask(maskShape.createGeometryMask())
+    c.add(maskShape)
+    this.bindPanelScroll(c, panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, delta => applyScroll(scrollY + delta))
+
+    items.forEach((weapon, i) => {
+      const price = this.buyPrice(weapon.id)
+      this.createListRow(list, {
+        x: panelX,
+        y: viewTop + 4 + i * rowH,
+        w: panelW,
+        h: rowH,
+        icon: weapon.emoji,
+        iconColor: RARITY_COLORS[weapon.rarity],
+        title: weapon.name,
+        detail: this.compactEquipmentDescription(weapon.description),
+        meta: `${price} CREDIT`,
+        enabled: this.save.credits >= price,
+        onDragDelta: delta => applyScroll(scrollY + delta),
+        onClick: () => this.showBuyConfirm(weapon.id),
+      })
+    })
+
+    if (maxScroll > 0) {
+      c.add(this.add.text(panelX + panelW / 2, panelY + panelH - 22, '▼', {
+        fontSize: '13px', color: '#7d8ca3',
+      }).setOrigin(0.5))
+    }
+    this.addShopSelectionHeader(c, panelX, panelY, panelW, '購入')
+  }
+
   private buildSellShop(c: Phaser.GameObjects.Container) {
-    this.buildShopBackButton(c)
     const items = this.save.ownedWeapons.filter(w => !w.equippedCharId && WEAPONS[w.weaponId])
+    const panelX = 0
+    const panelY = CONTENT_TOP + 38
+    const panelW = GAME_W
+    const panelH = GAME_H - TAB_H - panelY - 8
+    const viewTop = panelY + 42
+    const viewBottom = GAME_H - TAB_H - 18
+    const viewHeight = viewBottom - viewTop
+    const rowH = UI_LIST_ROW_H
+
+    this.createSelectionPanel(c, panelX, panelY, panelW, panelH)
     if (items.length === 0) {
-      c.add(this.add.text(160, CONTENT_TOP + 120, '\u58f2\u5374\u3067\u304d\u308b\u30a2\u30a4\u30c6\u30e0\u306f\u3042\u308a\u307e\u305b\u3093\u3002', {
+      c.add(this.add.text(panelX + panelW / 2, viewTop + 56, '\u58f2\u5374\u3067\u304d\u308b\u30a2\u30a4\u30c6\u30e0\u306f\u3042\u308a\u307e\u305b\u3093\u3002', {
         fontSize: '15px', color: '#8ea0bb', align: 'center',
       }).setOrigin(0.5))
+      this.addShopSelectionHeader(c, panelX, panelY, panelW, '売却')
       return
     }
 
     const list = this.add.container(0, 0)
     c.add(list)
-    const cardW = 270
-    const cardH = 74
-    const gap = 8
-    const viewTop = CONTENT_TOP + 14
-    const viewBottom = GAME_H - TAB_H - 10
-    const viewHeight = viewBottom - viewTop
-    const contentHeight = items.length * (cardH + gap) + 8
+    const contentHeight = Math.max(viewHeight, items.length * rowH + 8)
     const maxScroll = Math.max(0, contentHeight - viewHeight)
     let scrollY = 0
     const applyScroll = (next: number) => {
@@ -1475,28 +1591,38 @@ export class HomeScene extends Phaser.Scene {
       list.y = -scrollY
     }
 
-    const maskShape = this.add.rectangle(160, (viewTop + viewBottom) / 2, cardW + 12, viewHeight, 0xffffff)
+    const maskShape = this.add.rectangle(panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, 0xffffff)
     maskShape.setVisible(false)
     list.setMask(maskShape.createGeometryMask())
     c.add(maskShape)
-    this.bindPanelScroll(c, 160, (viewTop + viewBottom) / 2, cardW + 12, viewHeight, delta => applyScroll(scrollY + delta))
+    this.bindPanelScroll(c, panelX + panelW / 2, (viewTop + viewBottom) / 2, panelW, viewHeight, delta => applyScroll(scrollY + delta))
 
     items.forEach((owned, i) => {
-      const y = viewTop + i * (cardH + gap)
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon) return
+      const y = viewTop + 4 + i * rowH
       const price = this.sellPrice(owned)
-      this.createItemCard(list, owned, 160, y, cardW, {
+      this.createListRow(list, {
+        x: panelX,
+        y,
+        w: panelW,
+        h: rowH,
+        icon: weapon.emoji,
+        iconColor: RARITY_COLORS[weapon.rarity],
+        title: this.equipmentDisplayName(weapon.name, owned.level),
+        detail: this.compactEquipmentDescription(weapon.description),
+        meta: `${price} CREDIT`,
         onDragDelta: delta => applyScroll(scrollY + delta),
         onClick: () => this.showSellConfirm(owned.uid),
       })
-      const priceText = this.add.text(160 + cardW / 2 - 10, y + cardH - 18, `${price} CREDIT`, {
-        fontSize: '12px', color: '#ffdd88', fontStyle: 'bold',
-      }).setOrigin(1, 0)
-      list.add(priceText)
     })
 
     if (maxScroll > 0) {
-      c.add(this.add.text(286, viewBottom - 8, 'v', { fontSize: '14px', color: '#556680' }).setOrigin(0.5))
+      c.add(this.add.text(panelX + panelW / 2, panelY + panelH - 22, '▼', {
+        fontSize: '13px', color: '#7d8ca3',
+      }).setOrigin(0.5))
     }
+    this.addShopSelectionHeader(c, panelX, panelY, panelW, '売却')
   }
 
   private buildResearchShop(c: Phaser.GameObjects.Container) {
@@ -1713,6 +1839,18 @@ export class HomeScene extends Phaser.Scene {
     )
   }
 
+  private showBuyConfirm(weaponId: string) {
+    this.save = this.loadSave()
+    const weapon = WEAPONS[weaponId]
+    if (!weapon || weapon.rarity !== 'N') return
+    const price = this.buyPrice(weaponId)
+    if (this.save.credits < price) return
+    this.showConfirmDialog(
+      `${weapon.name}\n${this.compactEquipmentDescription(weapon.description)}\n${price} CREDIT で購入します。`,
+      () => this.buyShopWeapon(weaponId),
+    )
+  }
+
   private showConfirmDialog(message: string, onYes: () => void) {
     const overlay = this.add.container(0, 0).setDepth(200)
     const veil = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.58)
@@ -1790,6 +1928,26 @@ export class HomeScene extends Phaser.Scene {
     const price = this.sellPrice(target)
     this.save.ownedWeapons = this.save.ownedWeapons.filter(w => w.uid !== uid)
     this.save.credits += price
+    saveGame(this.save)
+    this.refreshTopStatus()
+    this.rebuildPanel(3, this.buildShopPanel())
+    this.panels[3].setVisible(true)
+  }
+
+  private buyShopWeapon(weaponId: string) {
+    this.save = this.loadSave()
+    const weapon = WEAPONS[weaponId]
+    const price = this.buyPrice(weaponId)
+    if (!weapon || weapon.rarity !== 'N' || this.save.credits < price) return
+    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+    this.save.ownedWeapons.push({
+      uid,
+      weaponId,
+      equippedCharId: null,
+      level: 0,
+      rarity: weapon.rarity,
+    })
+    this.save.credits -= price
     saveGame(this.save)
     this.refreshTopStatus()
     this.rebuildPanel(3, this.buildShopPanel())

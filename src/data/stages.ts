@@ -653,7 +653,25 @@ const STAGE_ENEMY_HP_MULTS = [
   13.50, 14.38, 15.29, 16.23, 17.20,
 ]
 
-export const STAGES: StageConfig[] = RAW_STAGES.map((stage, index) => ({
-  ...stage,
-  enemyHpMult: STAGE_ENEMY_HP_MULTS[index] ?? 1,
-}))
+function compressSpawnSchedule(stage: StageConfig, seconds: number): StageConfig {
+  const times = stage.spawnTable.map(entry => entry.time)
+  const first = Math.min(...times)
+  const last = Math.max(...times)
+  if (seconds <= 0 || last - first <= seconds) return stage
+  const scale = (last - first - seconds) / (last - first)
+  return {
+    ...stage,
+    spawnTable: stage.spawnTable.map(entry => ({
+      ...entry,
+      time: Math.max(1, Math.round((first + (entry.time - first) * scale) * 10) / 10),
+    })),
+  }
+}
+
+export const STAGES: StageConfig[] = RAW_STAGES.map((rawStage, index) => {
+  const stage = index < 7 ? compressSpawnSchedule(rawStage, 20) : rawStage
+  return {
+    ...stage,
+    enemyHpMult: STAGE_ENEMY_HP_MULTS[index] ?? 1,
+  }
+})
