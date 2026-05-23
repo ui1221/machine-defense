@@ -116,6 +116,7 @@ export interface WeaponConfig {
   atkMult: number
   atkSpeedMult: number  // < 1 = faster
   rangeMult: number
+  areaMult?: number
   critChance: number
 }
 

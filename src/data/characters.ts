@@ -26,8 +26,8 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
     range: 900,
     bulletSpeed: 1200,
     baseCritChance: 0.2,
-    upgradeAtkGrowthRate: 0.07,
-    upgradeCritGrowth: 0.0015,
+    upgradeAtkGrowthRate: 0.085,
+    upgradeCritGrowth: 0.002,
   },
   rapid: {
     id: 'rapid',
@@ -107,8 +107,8 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
     range: 850,
     bulletSpeed: 0,
     baseCritChance: 0.5,
-    upgradeAtkGrowthRate: 0.08,
-    upgradeCritGrowth: 0.0012,
+    upgradeAtkGrowthRate: 0.1,
+    upgradeCritGrowth: 0.0018,
   },
 }
 

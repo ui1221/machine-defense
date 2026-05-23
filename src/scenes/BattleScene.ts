@@ -25,8 +25,8 @@ import type { StageConfig, BattleState, GameSave, CharacterDamageStat } from '..
 const ZONE_RADIUS = 62
 const FIELD_ZONE_DAMAGE_MULT = 0.68
 const BEAM_ZONE_DAMAGE_MULT = 0.48
-const BEAM_SLOW_DURATION = 420
-const BEAM_SLOW_FACTOR = 0.9
+const BEAM_SLOW_DURATION = 650
+const BEAM_SLOW_FACTOR = 0.78
 const CRIT_MULT = 2.5
 const RAILGUN_KNOCKBACK_DIST = 80
 const ORB_KNOCKBACK_DIST = 8
@@ -545,7 +545,7 @@ export class BattleScene extends Phaser.Scene {
   private hitWithStun(ch: Character, enemy: Enemy, damageMult = 1) {
     const rolled = this.rollCharacterDamage(ch.config.id, ch.effectiveAtk * damageMult)
     const dead = enemy.takeDamage(rolled.damage)
-    enemy.stun(this.elapsedMs + 3400)
+    enemy.stun(this.elapsedMs + 4000)
     this.showStunImpact(enemy.x, enemy.y)
     this.recordCharacterDamage(ch.config.id, enemy.lastDamageTaken)
     this.showDamageNumber(enemy.x, enemy.y, enemy.lastDamageTaken, 0xaaddff, rolled.crit)
@@ -744,6 +744,7 @@ export class BattleScene extends Phaser.Scene {
       if (weapon.atkSpeedMult < 1)   ch.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
       if (weapon.atkSpeedMult > 1)   ch.atkSpeedMult *= weapon.atkSpeedMult
       if (weapon.rangeMult !== 1)    ch.rangeMult    *= 1 + (weapon.rangeMult - 1) * bonus
+      if (weapon.areaMult && weapon.areaMult !== 1) ch.areaMult *= 1 + (weapon.areaMult - 1) * bonus
       if (weapon.critChance > 0)     ch.critChance   += weapon.critChance * bonus
     }
   }

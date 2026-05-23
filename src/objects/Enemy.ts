@@ -198,7 +198,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     if (this.hasAbility('boss')) {
       const now = (this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now
       until = now + Math.max(0, until - now) * 0.35
-      factor = Math.max(factor, 0.88)
+      factor = Math.max(factor, 0.84)
     }
     this.slowedUntil = Math.max(this.slowedUntil, until)
     this.persistentSlowFactor = Math.min(this.persistentSlowFactor, factor)

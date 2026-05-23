@@ -6,6 +6,7 @@ import { ENEMIES } from '../data/enemies'
 import { canEquipWeaponToCharacter, equipmentSlotLabel, RARITY_COLORS, WEAPONS } from '../data/weapons'
 import { RESEARCH_ITEMS, type ResearchItem } from '../data/research'
 import { loadSave, markStagePlayed, saveGame, upgradeCost } from '../systems/SaveData'
+import { LobbyLineSelector } from '../systems/LobbyLineSelector'
 import type { EquipmentSlot, GameSave, OwnedWeapon } from '../types'
 import {
   UI_ACTIVE_STROKE_ALPHA,
@@ -73,6 +74,7 @@ export class HomeScene extends Phaser.Scene {
   private lobbyMessageContainer?: Phaser.GameObjects.Container
   private lobbyMessageText?: Phaser.GameObjects.Text
   private lobbyMessageTimer?: Phaser.Time.TimerEvent
+  private lobbyLineSelector = new LobbyLineSelector()
   private inHubMenu = false
   private activeTab = 0
   private selectedCharacterId = 'assault'
@@ -438,8 +440,13 @@ export class HomeScene extends Phaser.Scene {
     portrait.on('pointerdown', () => {
       this.showLobbyMessage('準備はできています。出撃先を選んでください。')
     })
+    portrait.removeAllListeners('pointerdown')
+    portrait.on('pointerdown', () => {
+      this.showLobbyMessage(this.pickLobbyLine('tap'))
+    })
     c.add([portrait])
     this.shellObjects.forEach(obj => obj.setVisible(true))
+    const returningFromBattle = this.playLobbyReturnIntro
     if (this.playLobbyReturnIntro) {
       this.playLobbyReturnIntro = false
       this.playLobbyReturnAnimation(portrait)
@@ -450,6 +457,16 @@ export class HomeScene extends Phaser.Scene {
       this.slidePortraitIn(portrait)
       this.showLobbyMessage('次の出撃に備えています。必要なら装備と研究を確認してください。')
     }
+    if (returningFromBattle) {
+      this.time.delayedCall(1060, () => this.showLobbyMessage(this.pickLobbyLine('return')))
+    } else {
+      this.showLobbyMessage(this.pickLobbyLine('idle'))
+    }
+  }
+
+  private pickLobbyLine(trigger: 'idle' | 'tap' | 'return') {
+    this.save = this.loadSave()
+    return this.lobbyLineSelector.pick(this.save, trigger)
   }
 
   private playLobbyReturnAnimation(portrait: StandeeObject) {
