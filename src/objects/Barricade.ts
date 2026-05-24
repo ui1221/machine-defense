@@ -33,7 +33,7 @@ export class Barricade {
   takeDamage(amount: number, scene: Phaser.Scene): boolean {
     this.hp = Math.max(0, this.hp - amount)
     this.updateBar()
-    scene.cameras.main.shake(150, 0.008)
+    scene.cameras.main.shake(120, 0.002)
 
     scene.tweens.add({
       targets: this.body,

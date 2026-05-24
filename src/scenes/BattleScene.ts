@@ -5,7 +5,7 @@ import {
 } from '../constants'
 import { STAGES } from '../data/stages'
 import { stageBackgroundKey } from '../data/stageBackgrounds'
-import { applyRenderScale } from '../utils/display'
+import { applyRenderScale, logicalPointer } from '../utils/display'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { canEquipWeaponToCharacter, WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
@@ -93,7 +93,48 @@ export class BattleScene extends Phaser.Scene {
     this.levelUpManager = new LevelUpManager()
 
     this.addCharacter(this.stage.startingCharacter)
+    this.installTapSparkle()
     this.scene.launch('BattleUIScene', { battle: this })
+  }
+
+  private installTapSparkle() {
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const pos = logicalPointer(p)
+      this.spawnTapSparkle(pos.x, pos.y)
+    })
+  }
+
+  private spawnTapSparkle(x: number, y: number) {
+    const c = this.add.container(x, y).setDepth(80)
+    const ring = this.add.circle(0, 0, 4, 0xffffff, 0)
+      .setStrokeStyle(2, 0xbfefff, 0.85)
+    c.add(ring)
+
+    for (let i = 0; i < 6; i += 1) {
+      const a = (Math.PI * 2 * i) / 6
+      const dot = this.add.circle(0, 0, i % 2 === 0 ? 2.5 : 2, i % 2 === 0 ? 0xffffff : 0x8ad7ff, 0.95)
+      c.add(dot)
+      this.tweens.add({
+        targets: dot,
+        x: Math.cos(a) * 24,
+        y: Math.sin(a) * 24,
+        alpha: 0,
+        scaleX: 0.35,
+        scaleY: 0.35,
+        duration: 280,
+        ease: 'Cubic.easeOut',
+      })
+    }
+
+    this.tweens.add({
+      targets: ring,
+      scaleX: 2.6,
+      scaleY: 2.6,
+      alpha: 0,
+      duration: 300,
+      ease: 'Cubic.easeOut',
+      onComplete: () => c.destroy(),
+    })
   }
 
   private buildBattleBackground() {

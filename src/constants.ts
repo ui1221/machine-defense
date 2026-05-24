@@ -1,6 +1,7 @@
 export const GAME_W = 480
 export const GAME_H = 854
-export const RENDER_SCALE = 2.5
+const _deviceScale = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+export const RENDER_SCALE = Math.min(2.5, Math.max(1.25, Math.ceil(_deviceScale * 4) / 4))
 
 // バリケード位置
 export const BARRICADE_Y = GAME_H - 140
