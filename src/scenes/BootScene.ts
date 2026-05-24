@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { applyRenderScale } from '../utils/display'
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('BootScene') }
@@ -20,6 +21,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    applyRenderScale(this)
     this.anims.create({
       key: 'mass_robot_front_walk',
       frames: this.anims.generateFrameNumbers('mass_robot', { start: 56, end: 61 }),

@@ -1,5 +1,6 @@
 export const GAME_W = 480
 export const GAME_H = 854
+export const RENDER_SCALE = 3
 
 // バリケード位置
 export const BARRICADE_Y = GAME_H - 140

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GAME_W, GAME_H } from './constants'
+import { GAME_W, GAME_H, RENDER_SCALE } from './constants'
 import { BootScene } from './scenes/BootScene'
 import { HomeScene } from './scenes/HomeScene'
 import { BattleScene } from './scenes/BattleScene'
@@ -19,6 +19,7 @@ Phaser.GameObjects.GameObjectFactory.prototype.text = function (
 ) {
   const normalizedStyle: Phaser.Types.GameObjects.Text.TextStyle = {
     ...(style ?? {}),
+    resolution: style?.resolution ?? RENDER_SCALE,
     padding: {
       top: TEXT_PADDING_TOP,
       bottom: TEXT_PADDING_BOTTOM,
@@ -30,9 +31,8 @@ Phaser.GameObjects.GameObjectFactory.prototype.text = function (
 
 const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean; resolution?: number } = {
   type: Phaser.AUTO,
-  width: GAME_W,
-  height: GAME_H,
-  resolution: Math.min(window.devicePixelRatio || 1, 3),
+  width: GAME_W * RENDER_SCALE,
+  height: GAME_H * RENDER_SCALE,
   backgroundColor: '#111122',
   parent: document.body,
   scene: [BootScene, HomeScene, BattleScene, BattleUIScene, ResultScene],

@@ -5,6 +5,7 @@ import {
 } from '../constants'
 import { STAGES } from '../data/stages'
 import { stageBackgroundKey } from '../data/stageBackgrounds'
+import { applyRenderScale } from '../utils/display'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { canEquipWeaponToCharacter, WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
@@ -76,6 +77,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create() {
+    applyRenderScale(this)
     // 背景は後から画像に差し替えやすいよう、戦場・防衛帯・足元で分けておく。
     this.buildBattleBackground()
     this.add.rectangle(GAME_W / 2, BARRICADE_Y - 42, GAME_W - 28, 4, 0x293149, 0.9).setDepth(1)

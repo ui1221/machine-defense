@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GAME_W, GAME_H } from '../constants'
 import { STAGES } from '../data/stages'
 import { stageBackgroundKey } from '../data/stageBackgrounds'
+import { applyRenderScale } from '../utils/display'
 import { CHARACTERS } from '../data/characters'
 import { RARITY_COLORS, WEAPONS } from '../data/weapons'
 import { addCredits, addOwnedWeapons, loadSave, markStageCleared } from '../systems/SaveData'
@@ -39,6 +40,7 @@ export class ResultScene extends Phaser.Scene {
   constructor() { super('ResultScene') }
 
   create(data: ResultData) {
+    applyRenderScale(this)
     const { victory, stageId, killCount, level, droppedWeapons = [], damageStats = [] } = data
     const stage = STAGES.find(s => s.id === stageId) ?? STAGES[0]
     const researchBonus = 1 + loadSave().upgrades.researchLevel * 0.02

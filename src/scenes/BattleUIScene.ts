@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { BARRICADE_Y, GAME_W } from '../constants'
+import { applyRenderScale } from '../utils/display'
 import type { BattleScene } from './BattleScene'
 import type { UpgradeOption } from '../types'
 import {
@@ -42,6 +43,7 @@ export class BattleUIScene extends Phaser.Scene {
   }
 
   create() {
+    applyRenderScale(this)
     // 上段HUD。中央の戦場面積を守るため、情報は最上部に押し込む。
     this.levelText = this.add.text(12, 7, 'Lv.0', {
       fontSize: '16px', color: '#ffdd44', fontStyle: 'bold',

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { GAME_W, GAME_H } from '../constants'
+import { applyRenderScale } from '../utils/display'
 import { STAGES } from '../data/stages'
 import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
@@ -87,6 +88,7 @@ export class HomeScene extends Phaser.Scene {
   constructor() { super('HomeScene') }
 
   create(data?: { fromBattle?: boolean }) {
+    applyRenderScale(this)
     this.save = this.loadSave()
     this.panels = []
     this.tabTexts = []
