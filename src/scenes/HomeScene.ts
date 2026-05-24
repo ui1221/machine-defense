@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { GAME_W, GAME_H } from '../constants'
-import { applyRenderScale } from '../utils/display'
+import { applyRenderScale, logicalPointer } from '../utils/display'
 import { STAGES } from '../data/stages'
 import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
@@ -181,7 +181,8 @@ export class HomeScene extends Phaser.Scene {
 
   private installTapSparkle() {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      this.spawnTapSparkle(p.x, p.y)
+      const pos = logicalPointer(p)
+      this.spawnTapSparkle(pos.x, pos.y)
     })
   }
 
@@ -1050,11 +1051,12 @@ export class HomeScene extends Phaser.Scene {
     scrollHit.on('wheel', (_p: Phaser.Input.Pointer, _x: number, _y: number, dy: number) => applyScroll(scrollY + dy * 0.6))
     let dragging = false
     let lastY = 0
-    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = p.y })
+    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = logicalPointer(p).y })
     scrollHit.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!dragging || !p.isDown) return
-      applyScroll(scrollY + (lastY - p.y))
-      lastY = p.y
+      const currentY = logicalPointer(p).y
+      applyScroll(scrollY + (lastY - currentY))
+      lastY = currentY
     })
     scrollHit.on('pointerup', () => { dragging = false })
     scrollHit.on('pointerout', () => { dragging = false })
@@ -1126,16 +1128,17 @@ export class HomeScene extends Phaser.Scene {
       let pressed = false
       bg.setInteractive({ useHandCursor: !!params.onClick })
       bg.on('pointerdown', (p: Phaser.Input.Pointer) => {
-        downY = p.y
+        downY = logicalPointer(p).y
         moved = 0
         pressed = true
         bg.setFillStyle(0x132137, UI_LIST_ROW_PRESSED_FILL_ALPHA)
       })
       bg.on('pointermove', (p: Phaser.Input.Pointer) => {
         if (!pressed || !p.isDown || !params.onDragDelta) return
-        const delta = downY - p.y
+        const currentY = logicalPointer(p).y
+        const delta = downY - currentY
         moved += Math.abs(delta)
-        downY = p.y
+        downY = currentY
         params.onDragDelta(delta)
       })
       bg.on('pointerup', () => {
@@ -1184,8 +1187,10 @@ export class HomeScene extends Phaser.Scene {
     h: number,
     applyDelta: (delta: number) => void,
   ) {
-    const contains = (p: Phaser.Input.Pointer) =>
-      p.x >= x - w / 2 && p.x <= x + w / 2 && p.y >= y - h / 2 && p.y <= y + h / 2
+    const contains = (p: Phaser.Input.Pointer) => {
+      const pos = logicalPointer(p)
+      return pos.x >= x - w / 2 && pos.x <= x + w / 2 && pos.y >= y - h / 2 && pos.y <= y + h / 2
+    }
     let dragging = false
     let lastY = 0
     const onWheel = (p: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
@@ -1194,12 +1199,13 @@ export class HomeScene extends Phaser.Scene {
     const onDown = (p: Phaser.Input.Pointer) => {
       if (!contains(p)) return
       dragging = true
-      lastY = p.y
+      lastY = logicalPointer(p).y
     }
     const onMove = (p: Phaser.Input.Pointer) => {
       if (!dragging || !p.isDown) return
-      applyDelta(lastY - p.y)
-      lastY = p.y
+      const currentY = logicalPointer(p).y
+      applyDelta(lastY - currentY)
+      lastY = currentY
     }
     const onUp = () => { dragging = false }
     this.input.on('wheel', onWheel)
@@ -1220,12 +1226,12 @@ export class HomeScene extends Phaser.Scene {
     let moved = 0
     target.on('pointerdown', (p: Phaser.Input.Pointer) => {
       pressed = true
-      downY = p.y
+      downY = logicalPointer(p).y
       moved = 0
     })
     target.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!pressed) return
-      moved = Math.max(moved, Math.abs(p.y - downY))
+      moved = Math.max(moved, Math.abs(logicalPointer(p).y - downY))
     })
     target.on('pointerup', () => {
       if (pressed && moved < 8) onTap()
@@ -1765,11 +1771,12 @@ export class HomeScene extends Phaser.Scene {
     scrollHit.on('wheel', (_p: Phaser.Input.Pointer, _x: number, _y: number, dy: number) => applyScroll(scrollY + dy * 0.6))
     let dragging = false
     let lastY = 0
-    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = p.y })
+    scrollHit.on('pointerdown', (p: Phaser.Input.Pointer) => { dragging = true; lastY = logicalPointer(p).y })
     scrollHit.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!dragging || !p.isDown) return
-      applyScroll(scrollY + (lastY - p.y))
-      lastY = p.y
+      const currentY = logicalPointer(p).y
+      applyScroll(scrollY + (lastY - currentY))
+      lastY = currentY
     })
     scrollHit.on('pointerup', () => { dragging = false })
     scrollHit.on('pointerout', () => { dragging = false })
