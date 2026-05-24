@@ -45,6 +45,44 @@ const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean
 const game = new Phaser.Game(config as Phaser.Types.Core.GameConfig)
 ;(window as any).__game = game
 
+if (new URLSearchParams(window.location.search).has('debugCanvas')) {
+  const panel = document.createElement('pre')
+  panel.style.position = 'fixed'
+  panel.style.left = '8px'
+  panel.style.top = '8px'
+  panel.style.zIndex = '9999'
+  panel.style.maxWidth = 'calc(100vw - 16px)'
+  panel.style.padding = '8px 10px'
+  panel.style.background = 'rgba(0, 0, 0, 0.82)'
+  panel.style.color = '#fff'
+  panel.style.font = '12px/1.45 monospace'
+  panel.style.whiteSpace = 'pre-wrap'
+  panel.style.pointerEvents = 'none'
+  document.body.appendChild(panel)
+
+  const updateCanvasDebug = () => {
+    const canvas = document.querySelector('canvas')
+    if (!canvas) {
+      panel.textContent = 'canvas: not found'
+      return
+    }
+    const rect = canvas.getBoundingClientRect()
+    panel.textContent = [
+      `dpr: ${window.devicePixelRatio.toFixed(3)}`,
+      `inner: ${window.innerWidth} x ${window.innerHeight}`,
+      `canvas attr: ${canvas.width} x ${canvas.height}`,
+      `canvas css: ${canvas.clientWidth} x ${canvas.clientHeight}`,
+      `canvas rect: ${rect.width.toFixed(2)} x ${rect.height.toFixed(2)}`,
+      `ratio attr/css: ${(canvas.width / canvas.clientWidth).toFixed(3)} x ${(canvas.height / canvas.clientHeight).toFixed(3)}`,
+      `ratio attr/rect: ${(canvas.width / rect.width).toFixed(3)} x ${(canvas.height / rect.height).toFixed(3)}`,
+    ].join('\n')
+  }
+
+  updateCanvasDebug()
+  window.addEventListener('resize', updateCanvasDebug)
+  setInterval(updateCanvasDebug, 1000)
+}
+
 // プレビュー環境でフォーカスなしでも動作させる
 document.addEventListener('visibilitychange', () => {
   if (game.loop) game.loop.wake()
