@@ -29,7 +29,6 @@ export class LobbyLineSelector {
     return {
       save,
       canUpgradeCharacter: this.canUpgradeCharacter(save),
-      hasUnequippedItem: save.ownedWeapons.some(item => !item.equippedCharId),
       hasAnyResearch: RESEARCH_ITEMS.some(item => Number(save.upgrades[item.id] ?? 0) > 0),
     }
   }

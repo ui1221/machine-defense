@@ -32,7 +32,7 @@ const config: Phaser.Types.Core.GameConfig & { disableVisibilityChange?: boolean
   type: Phaser.AUTO,
   width: GAME_W,
   height: GAME_H,
-  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  resolution: Math.min(window.devicePixelRatio || 1, 3),
   backgroundColor: '#111122',
   parent: document.body,
   scene: [BootScene, HomeScene, BattleScene, BattleUIScene, ResultScene],

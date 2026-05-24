@@ -5,7 +5,6 @@ export type LobbyLineTrigger = 'idle' | 'tap' | 'return'
 export interface LobbyLineContext {
   save: GameSave
   canUpgradeCharacter: boolean
-  hasUnequippedItem: boolean
   hasAnyResearch: boolean
 }
 
@@ -49,13 +48,6 @@ export const LOBBY_LINES: LobbyLine[] = [
     text: 'クレジットが貯まっています。ショップで補給できます。',
     weight: 3,
     condition: ({ save }) => save.credits >= 1000,
-  },
-  {
-    id: 'idle_unequipped',
-    trigger: 'idle',
-    text: '未装備のパーツがあります。誰かに装備させられそうです。',
-    weight: 3,
-    condition: ({ hasUnequippedItem }) => hasUnequippedItem,
   },
   {
     id: 'idle_upgrade_available',

@@ -4,6 +4,7 @@ import {
   SPAWN_Y, SPAWN_MARGIN_X, FIELD_LEFT, FIELD_RIGHT, CHAR_SLOTS, DEFAULT_BARRICADE_HP,
 } from '../constants'
 import { STAGES } from '../data/stages'
+import { stageBackgroundKey } from '../data/stageBackgrounds'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { canEquipWeaponToCharacter, WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
@@ -94,13 +95,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private buildBattleBackground() {
-    const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
-    const bgKey = stageNo <= 3 ? 'stage_forest_bg'
-      : stageNo <= 6 ? 'stage_facility_entrance_bg'
-        : stageNo <= 15 ? 'stage_base_day_bg'
-          : stageNo <= 23 ? 'stage_base_evening_bg'
-            : stageNo <= 30 ? 'stage_base_night_bg'
-              : null
+    const bgKey = stageBackgroundKey(this.stage.id)
     if (bgKey) {
       const bg = this.add.image(GAME_W / 2, GAME_H / 2, bgKey).setOrigin(0.5).setDepth(-10)
       const src = bg.texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement
