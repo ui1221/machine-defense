@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
-import { RENDER_SCALE } from '../constants'
+import { GAME_H, GAME_W, RENDER_SCALE } from '../constants'
 
 export function applyRenderScale(scene: Phaser.Scene) {
-  scene.cameras.main.setZoom(RENDER_SCALE)
-  scene.cameras.main.setScroll(0, 0)
+  const camera = scene.cameras.main
+  camera.setZoom(RENDER_SCALE)
+  camera.setScroll(-GAME_W, -GAME_H)
 }
