@@ -5,7 +5,7 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
     id: 'assault',
     emoji: '🤖',
     name: 'アサルト型',
-    description: '標準的な射撃ユニット。扱いやすいが、強化なしでは火力不足になりやすい。',
+    description: '標準的な射撃ユニット。強化なしでは火力不足になりやすい。',
     attackType: 'burst',
     atk: 5,
     atkSpeed: 1100,

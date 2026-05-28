@@ -31,6 +31,7 @@ export interface EnemyConfig {
   id: string
   name: string
   emoji: string
+  imageKey?: string
   description?: string
   hp: number
   speed: number       // px/s downward

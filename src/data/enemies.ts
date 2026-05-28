@@ -7,12 +7,12 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     hp: 15, speed: 9, damage: 5, expReward: 5, size: 18, color: 0x7c8aa0,
   },
   light: {
-    id: 'light', name: '軽量型', emoji: '◇',
+    id: 'light', name: '軽量型', emoji: '◇', imageKey: 'enemy_white_creature',
     description: 'やや速く、耐久は低い。',
     hp: 9, speed: 14, damage: 3, expReward: 4, size: 15, color: 0x8fc7ff,
   },
   fast: {
-    id: 'fast', name: '高速型', emoji: '🔺',
+    id: 'fast', name: '高速型', emoji: '🔺', imageKey: 'enemy_red_creature',
     description: '速度が高いが、HPは低め。',
     hp: 10, speed: 17, damage: 3, expReward: 4, size: 16, color: 0xffaa55,
   },
@@ -28,7 +28,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     knockbackResist: 0.45,
   },
   guard: {
-    id: 'guard', name: '防盾型', emoji: '▣',
+    id: 'guard', name: '防盾型', emoji: '▣', imageKey: 'enemy_blue_creature',
     description: '高めのHPで前線に残りやすい。',
     hp: 42, speed: 7, damage: 8, expReward: 10, size: 22, color: 0x55aaff,
     knockbackResist: 0.35,
@@ -100,7 +100,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     hp: 8, speed: 20, damage: 2, expReward: 3, size: 13, color: 0x66ffee,
   },
   medic: {
-    id: 'medic', name: '修復型', emoji: '✚',
+    id: 'medic', name: '修復型', emoji: '✚', imageKey: 'enemy_green_creature',
     description: '本人は脆いが、近くの敵を少しずつ修復する。',
     hp: 12, speed: 10, damage: 2, expReward: 7, size: 16, color: 0x77ffaa,
     abilities: ['heal_aura'],
@@ -118,7 +118,7 @@ export const ENEMIES: Record<string, EnemyConfig> = {
     abilities: ['elite'],
   },
   boss_siege: {
-    id: 'boss_siege', name: '大型制圧型', emoji: '⬣',
+    id: 'boss_siege', name: '大型制圧型', emoji: '⬣', imageKey: 'enemy_purple_creature',
     description: '区画を制圧するための大型機。遅いが、非常に高い耐久と強い攻撃を持つ。',
     hp: 650, speed: 6, damage: 30, expReward: 80, size: 42, color: 0xff8844,
     abilities: ['warning_attack', 'boss'],

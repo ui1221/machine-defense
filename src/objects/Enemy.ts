@@ -50,8 +50,20 @@ export class Enemy extends Phaser.GameObjects.Container {
     const hpBarY = isBoss ? -48 : -24
     const fontSize = isBoss ? '52px' : '30px'
 
-    this.bodyCircle = scene.add.circle(0, 2, cfg.size + (isBoss ? 10 : 4), cfg.color ?? 0x667788, isBoss ? 0.52 : 0.35)
-    if (cfg.id === 'basic') {
+    const hasImage = !!cfg.imageKey
+    this.bodyCircle = scene.add.circle(
+      0,
+      2,
+      cfg.size + (isBoss ? 10 : 4),
+      cfg.color ?? 0x667788,
+      hasImage ? (isBoss ? 0.22 : 0.12) : (isBoss ? 0.52 : 0.35),
+    )
+    if (cfg.imageKey) {
+      const sprite = scene.add.sprite(0, 0, cfg.imageKey).setOrigin(0.5)
+      const displaySize = cfg.size * (isBoss ? 3.25 : 3.15)
+      sprite.setDisplaySize(displaySize, displaySize)
+      this.label = sprite
+    } else if (cfg.id === 'basic') {
       const sprite = scene.add.sprite(0, 10, 'mass_robot', 56).setOrigin(0.5).setScale(0.34)
       sprite.play('mass_robot_front_walk')
       this.label = sprite
