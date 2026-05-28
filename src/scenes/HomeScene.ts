@@ -29,6 +29,7 @@ export class HomeScene extends Phaser.Scene {
   private shopMode: ShopMode = 'menu'
   private fileMode: FileMode | null = null
   private playLobbyReturnIntro = false
+  private domTapSparkleHandler?: (event: PointerEvent) => void
 
   constructor() { super('HomeScene') }
 
@@ -68,6 +69,25 @@ export class HomeScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       const pos = logicalPointer(p)
       this.spawnTapSparkle(pos.x, pos.y)
+    })
+
+    const root = document.getElementById('ui-root')
+    if (!root) return
+    this.domTapSparkleHandler = (event: PointerEvent) => {
+      if (event.button !== 0 && event.pointerType === 'mouse') return
+      const rect = root.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+      const x = ((event.clientX - rect.left) / rect.width) * GAME_W
+      const y = ((event.clientY - rect.top) / rect.height) * GAME_H
+      if (x < 0 || x > GAME_W || y < 0 || y > GAME_H) return
+      this.spawnTapSparkle(x, y)
+    }
+    root.addEventListener('pointerdown', this.domTapSparkleHandler, { capture: true })
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.domTapSparkleHandler) {
+        root.removeEventListener('pointerdown', this.domTapSparkleHandler, { capture: true })
+        this.domTapSparkleHandler = undefined
+      }
     })
   }
 

@@ -21,6 +21,24 @@
   -webkit-user-select: none;
   touch-action: manipulation;
   overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.md-ui-root *,
+.md-ui-root *::before,
+.md-ui-root *::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.md-ui-root button {
+  appearance: none;
+  -webkit-appearance: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.md-ui-root button:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .md-ui-screen {
