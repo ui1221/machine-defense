@@ -18,6 +18,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('stage_base_night_bg', '/machine-defense/assets/stage-base-night.png')
     this.load.image('barricade_full', '/machine-defense/assets/barricade-full.png')
     this.load.image('barricade_damaged', '/machine-defense/assets/barricade-damaged.png')
+    this.load.image('assault_battle', '/machine-defense/assets/assault-battle.png')
+    this.load.image('blade_battle', '/machine-defense/assets/blade-battle.png')
     this.load.image('enemy_red_creature', '/machine-defense/assets/enemy-red-creature.png')
     this.load.image('enemy_white_creature', '/machine-defense/assets/enemy-white-creature.png')
     this.load.image('enemy_green_creature', '/machine-defense/assets/enemy-green-creature.png')

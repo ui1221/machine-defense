@@ -268,12 +268,12 @@ export class BattleScene extends Phaser.Scene {
           this.time.delayedCall(action * 90, () => {
             if (!ch.active || this.gameEnded) return
             const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
-            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
-            const dist = Phaser.Math.Distance.Between(ch.x, ch.y, aim.tx, aim.ty)
+            const baseAng = Math.atan2(aim.ty - ch.attackY, aim.tx - ch.attackX)
+            const dist = Phaser.Math.Distance.Between(ch.attackX, ch.attackY, aim.tx, aim.ty)
             this.doSlash(
               ch,
-              ch.x + Math.cos(baseAng) * dist,
-              ch.y + Math.sin(baseAng) * dist,
+              ch.attackX + Math.cos(baseAng) * dist,
+              ch.attackY + Math.sin(baseAng) * dist,
               this.enemies.getChildren() as Enemy[],
             )
           })
@@ -311,13 +311,13 @@ export class BattleScene extends Phaser.Scene {
           this.time.delayedCall(action * 90, () => {
             if (!ch.active || this.gameEnded) return
             const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
-            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
+            const baseAng = Math.atan2(aim.ty - ch.attackY, aim.tx - ch.attackX)
             const angles = this.buildBurstAngles(baseAng, ch.burstCount)
             for (const ang of angles) {
               const hitsLeft = ch.piercing ? 2 : 1
               const b = new Bullet(
-                this, ch.x, ch.y - 10,
-                ch.x + Math.cos(ang) * 1000, ch.y + Math.sin(ang) * 1000,
+                this, ch.attackX, ch.attackY,
+                ch.attackX + Math.cos(ang) * 1000, ch.attackY + Math.sin(ang) * 1000,
                 ch.config.bulletSpeed, ch.effectiveAtk,
                 ch.config.id,
                 hitsLeft, 'normal',
@@ -338,10 +338,10 @@ export class BattleScene extends Phaser.Scene {
           this.time.delayedCall(action * 110, () => {
             if (!ch.active || this.gameEnded) return
             const aim = this.pickActionAim(ch, result.tx, result.ty, usedTargets)
-            const baseAng = Math.atan2(aim.ty - ch.y, aim.tx - ch.x)
+            const baseAng = Math.atan2(aim.ty - ch.attackY, aim.tx - ch.attackX)
             const b = new Bullet(
-              this, ch.x, ch.y - 10,
-              ch.x + Math.cos(baseAng) * 1000, ch.y + Math.sin(baseAng) * 1000,
+              this, ch.attackX, ch.attackY,
+              ch.attackX + Math.cos(baseAng) * 1000, ch.attackY + Math.sin(baseAng) * 1000,
               ch.config.bulletSpeed, ch.effectiveAtk,
               ch.config.id,
               hitsLeft, style,
@@ -411,14 +411,14 @@ export class BattleScene extends Phaser.Scene {
     if (this.inputManager.isPointerDown) return { tx: fallbackTx, ty: fallbackTy }
 
     const enemies = this.enemies.getChildren() as Enemy[]
-    const target = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.x, ch.y, usedTargets)
+    const target = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.attackX, ch.attackY, usedTargets)
     if (target) {
       usedTargets.add(target)
       return { tx: target.x, ty: target.y }
     }
 
     usedTargets.clear()
-    const retry = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.x, ch.y, usedTargets)
+    const retry = this.targeting.findFrontmostEnemy(enemies, ch.effectiveRange, ch.attackX, ch.attackY, usedTargets)
     if (retry) {
       usedTargets.add(retry)
       return { tx: retry.x, ty: retry.y }
@@ -504,11 +504,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createBeamZone(ch: Character, tx: number, ty: number) {
-    const ang = Math.atan2(ty - ch.y, tx - ch.x)
+    const ang = Math.atan2(ty - ch.attackY, tx - ch.attackX)
     const length = 1180 * ch.areaMult
     const width = 36 * ch.areaMult
-    const cx = ch.x + Math.cos(ang) * (length / 2)
-    const cy = ch.y + Math.sin(ang) * (length / 2)
+    const cx = ch.attackX + Math.cos(ang) * (length / 2)
+    const cy = ch.attackY + Math.sin(ang) * (length / 2)
     const beam = new BeamZone(this, cx, cy, length, width, ang, Math.max(1, Math.round(ch.effectiveAtk * BEAM_ZONE_DAMAGE_MULT)), ch.config.id)
     this.add.existing(beam)
     this.beamZones.push(beam)
@@ -517,11 +517,11 @@ export class BattleScene extends Phaser.Scene {
   private showBeamCharge(ch: Character, tx: number, ty: number, delay: number) {
     this.time.delayedCall(delay, () => {
       if (!ch.active || this.gameEnded) return
-      const angle = Math.atan2(ty - ch.y, tx - ch.x)
-      const spark = this.add.circle(ch.x, ch.y - 12, 8, 0xaaf2ff, 0.92).setDepth(18)
+      const angle = Math.atan2(ty - ch.attackY, tx - ch.attackX)
+      const spark = this.add.circle(ch.attackX, ch.attackY, 8, 0xaaf2ff, 0.92).setDepth(18)
       const guide = this.add.rectangle(
-        ch.x + Math.cos(angle) * 92,
-        ch.y + Math.sin(angle) * 92,
+        ch.attackX + Math.cos(angle) * 92,
+        ch.attackY + Math.sin(angle) * 92,
         184,
         4,
         0x66ddff,
@@ -546,7 +546,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createOrbField(ch: Character, tx: number, ty: number) {
-    const orb = new OrbField(this, ch.x, ch.y - 10, tx, ty, ch.config.bulletSpeed, Math.max(1, Math.round(ch.effectiveAtk * 0.7)), ch.config.id)
+    const orb = new OrbField(this, ch.attackX, ch.attackY, tx, ty, ch.config.bulletSpeed, Math.max(1, Math.round(ch.effectiveAtk * 0.7)), ch.config.id)
     this.add.existing(orb)
     this.orbFields.push(orb)
   }

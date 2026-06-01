@@ -7,6 +7,7 @@ import type { DomScreen } from './mount'
 import { portraitStandee } from './standee'
 
 const EQUIPMENT_SLOT_ORDER: EquipmentSlot[] = ['weapon', 'core', 'sensor', 'module']
+const BLADE_PORTRAIT_SRC = '/machine-defense/assets/blade-portrait.png'
 
 export interface CharacterScreenOptions {
   initialCharacterId: string
@@ -56,7 +57,8 @@ export function mountCharacterScreen(root: HTMLElement, opts: CharacterScreenOpt
     const canUpgrade = rawLevel < levelCap && save.credits >= cost
 
     screen.append(portraitStandee({
-      className: 'md-character-standee',
+      className: cfg.id === 'blade' ? 'md-character-standee md-character-standee--blade' : 'md-character-standee',
+      src: cfg.id === 'blade' ? BLADE_PORTRAIT_SRC : undefined,
       shadowColor: characterAccentColor(cfg.id),
       shadowAlpha: 0.42,
     }))
@@ -358,7 +360,7 @@ function rarityColor(rarity: keyof typeof RARITY_COLORS) {
 
 function characterAccentColor(charId: string) {
   if (charId === 'assault') return '#ffee00'
-  if (charId === 'blade') return '#55aaff'
+  if (charId === 'blade') return '#00E6CD'
   if (charId === 'orb') return '#9b6dff'
   if (charId === 'railgun') return '#ff6688'
   if (charId === 'field') return '#66dd88'

@@ -16,7 +16,8 @@ export class Character extends Phaser.GameObjects.Container {
   piercing = false
   burstCount = 1
 
-  private label: Phaser.GameObjects.Text
+  private visual: Phaser.GameObjects.Text | Phaser.GameObjects.Image
+  private visualBaseScale = 1
   private lastFired = 0
   private cooldownBar: Phaser.GameObjects.Rectangle
 
@@ -25,19 +26,26 @@ export class Character extends Phaser.GameObjects.Container {
     this.config = cfg
     this.critChance = cfg.baseCritChance ?? 0
     this.burstCount = cfg.baseBurstCount ?? 1
+    this.visualBaseScale = cfg.battleImageScale ?? 1
 
-    this.label = scene.add.text(0, 0, cfg.emoji, { fontSize: '36px' }).setOrigin(0.5)
+    this.visual = cfg.battleImageKey
+      ? scene.add.image(0, cfg.battleImageOffsetY ?? 0, cfg.battleImageKey)
+        .setOrigin(0.5, 1)
+        .setScale(this.visualBaseScale)
+      : scene.add.text(0, 0, cfg.emoji, { fontSize: '36px' }).setOrigin(0.5)
 
     const cdBg = scene.add.rectangle(0, 26, 36, 4, 0x222233)
     this.cooldownBar = scene.add.rectangle(-18, 26, 36, 4, 0xff8844).setOrigin(0, 0.5)
 
-    this.add([this.label, cdBg, this.cooldownBar])
+    this.add([this.visual, cdBg, this.cooldownBar])
     this.setDepth(5)
   }
 
   get effectiveAtk()      { return this.config.atk * this.atkMult }
   get effectiveAtkSpeed() { return this.config.atkSpeed * this.atkSpeedMult }
   get effectiveRange()    { return this.config.range * this.rangeMult }
+  get attackX()           { return this.x + (this.config.battleAttackOffsetX ?? 0) }
+  get attackY()           { return this.y + (this.config.battleAttackOffsetY ?? -10) }
 
   updateCooldown(now: number) {
     const elapsed = now - this.lastFired
@@ -62,7 +70,7 @@ export class Character extends Phaser.GameObjects.Container {
       tx = input.pointerX
       ty = input.pointerY
     } else {
-      const target = targeting.findFrontmostEnemy(enemies, this.effectiveRange, this.x, this.y)
+      const target = targeting.findFrontmostEnemy(enemies, this.effectiveRange, this.attackX, this.attackY)
       if (!target) return null
       tx = target.x
       ty = target.y
@@ -82,8 +90,9 @@ export class Character extends Phaser.GameObjects.Container {
 
   private animateShoot() {
     this.scene.tweens.add({
-      targets: this.label,
-      scaleX: 1.15, scaleY: 0.85,
+      targets: this.visual,
+      scaleX: this.visualBaseScale * 1.08,
+      scaleY: this.visualBaseScale * 0.94,
       duration: 60, yoyo: true,
     })
   }

@@ -13,6 +13,11 @@ export type AttackResult =
 export interface CharacterConfig {
   id: string
   emoji: string
+  battleImageKey?: string
+  battleImageScale?: number
+  battleImageOffsetY?: number
+  battleAttackOffsetX?: number
+  battleAttackOffsetY?: number
   name: string
   description: string
   attackType: AttackType

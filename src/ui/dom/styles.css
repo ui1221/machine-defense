@@ -429,8 +429,8 @@ button.md-portrait-standee {
   transform: translate(var(--md-standee-shadow-x), var(--md-standee-shadow-y));
   opacity: var(--md-standee-shadow-alpha);
   background: var(--md-standee-shadow);
-  -webkit-mask: url("/machine-defense/assets/home-portrait.png") top center / contain no-repeat;
-  mask: url("/machine-defense/assets/home-portrait.png") top center / contain no-repeat;
+  -webkit-mask: var(--md-standee-mask) top center / contain no-repeat;
+  mask: var(--md-standee-mask) top center / contain no-repeat;
 }
 
 .md-lobby-standee-screen {
@@ -632,6 +632,15 @@ button.md-portrait-standee {
   right: var(--md-standee-right);
   top: var(--md-standee-top);
   z-index: 0;
+}
+
+.md-character-standee--blade {
+  width: 620px;
+  height: 950px;
+  right: -205px;
+  top: 214px;
+  --md-standee-shadow-x: 13px;
+  --md-standee-shadow-y: 9px;
 }
 
 .md-character-selector,

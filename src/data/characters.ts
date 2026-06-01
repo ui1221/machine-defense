@@ -4,6 +4,11 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
   assault: {
     id: 'assault',
     emoji: '🤖',
+    battleImageKey: 'assault_battle',
+    battleImageScale: 0.105,
+    battleImageOffsetY: 80,
+    battleAttackOffsetX: 10,
+    battleAttackOffsetY: -48,
     name: 'アサルト型',
     description: '標準的な射撃ユニット。強化なしでは火力不足になりやすい。',
     attackType: 'burst',
@@ -46,6 +51,10 @@ export const CHARACTERS: Record<string, CharacterConfig> = {
   blade: {
     id: 'blade',
     emoji: '🛡️',
+    battleImageKey: 'blade_battle',
+    battleImageScale: 0.105,
+    battleImageOffsetY: 80,
+    battleAttackOffsetY: -44,
     name: 'ブレード型',
     description: '狭い範囲を高威力で斬る。ノックバック付きで、クールタイムは長い。',
     attackType: 'slash',
