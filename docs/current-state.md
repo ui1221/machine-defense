@@ -1,6 +1,6 @@
 # Current State Handoff
 
-Last updated: 2026-05-28
+Last updated: 2026-06-04
 
 This document is for continuing work in a new Codex thread without relying on the full chat history.
 
@@ -35,7 +35,7 @@ The user strongly dislikes:
 - Decorative additions without a clear reason.
 - UI elements overlapping because layout was not standardized.
 
-Use `docs/ui-design-rules.md` as the source of truth for UI rules.
+Use `docs/ui-design-rules.md` as the source of truth for UI rules. It was rewritten on 2026-06-04 after the old file became mojibake, and now reflects the current DOM-heavy UI direction.
 
 Current preferred style:
 
@@ -47,6 +47,100 @@ Current preferred style:
 - Header/back controls must stay above scroll content to avoid click-through.
 
 ## Recent Technical Context
+
+### June 2026 Battle / Progression Work
+
+Recent work after the older 2026-05-28 handoff includes:
+
+- Battle balance iteration for late stages, especially stages 25-30.
+- A new barricade-pressure enemy role (`latcher`) was added and inserted into later-stage pressure patterns.
+- Enemy barricade attacks now support per-enemy first attack delay, cooldown, and jitter.
+- Barricade damage can be fractional; the battle HUD rounds displayed HP up to avoid long decimal strings.
+- Boss durability and control resistance were increased.
+- Boss escort composition was adjusted so slow escorts are replaced with faster vanguard-style enemies near boss timing.
+- Late-stage HP pressure now changes by phase:
+  - Mid phase from 160s.
+  - Late phase from 240s.
+  - Boss phase from around 25s before boss spawn onward.
+- Victory no longer freezes instantly on the last enemy kill; result transition is delayed while the scene continues briefly.
+- Settings now include optional 4x speed and auto level-up.
+- Bullet collision uses swept segment checks so higher speed is less likely to tunnel through enemies.
+- The app tries to keep the game awake on preview blur by default; `sleepOnBlur` can opt out.
+
+### Battle HUD / Phase UI
+
+The fixed battle HUD is DOM-based.
+
+Recent additions:
+
+- Phase transition notices are DOM-based (`BattleHudScreen.ts`), not Phaser text.
+- Boss arrival notices are also DOM-based.
+- The red full-screen frame effect is now reserved for barricade damage feedback, not phase indication.
+- The phase/boss notice should stay readable on phone:
+  - fixed DOM layout
+  - no text overflow
+  - larger type than the first pass
+  - short timed display
+
+### Save / Testing Helpers
+
+Recent settings and save utility work:
+
+- Settings include toggles for:
+  - 4x speed
+  - auto level-up
+- The settings menu has save copy/restore helpers for preserving localStorage state during preview/dev work.
+
+### Weapon Enhancement
+
+Weapon enhancement has been implemented in the first pass.
+
+The spec and implementation notes are in:
+
+- `docs/weapon-enhancement-design.md`
+
+Implemented behavior:
+
+- Weapon enhancement is implemented first; cores, sensors, and modules are later.
+- Display enhancement at the end of the name, e.g. `Ion Rifle +3`.
+- `GameSave.junkParts` is a new currency.
+- Selling equipment grants existing credits plus a small amount of junk parts.
+- Rarity affects enhancement cap, not per-level value:
+  - `N`: +3
+  - `R`: +5
+  - `SR`: +7
+  - `SSR`: +10
+- Each enhancement level increases the weapon bonus portion by 10%.
+- Enhancement logic is centralized in `src/systems/EquipmentEnhancement.ts`.
+- The top status displays both credits and junk parts.
+- The shop upgrade screen marks equipped weapons with `E` in the level subtitle, e.g. `E +2/+5`.
+
+### Asset-Waiting Notes
+
+These are mostly user-side art production tasks, not immediate implementation tasks. Do not rush placeholder-heavy systems unless the user explicitly asks for them.
+
+Known remaining asset needs:
+
+- shop staff portrait
+- portraits for all units
+- face icons for all units
+- assault expression variants
+- battle ally graphics for all units
+- additional enemy graphics
+
+Future implementation idea once face icons exist:
+
+- replace compact equipment-owner text/marks such as `E` with unit face icons where useful
+- show who owns an equipped item in equipment-change and enhancement lists without taking much row space
+
+### Documentation Encoding Concern
+
+Some project files display as mojibake in shell output. This is not always the same issue:
+
+- Some PowerShell output can be misleading because of console encoding.
+- The old `docs/ui-design-rules.md` content appeared to contain substantial mojibake in the file itself.
+- `docs/ui-design-rules.md` was rewritten on 2026-06-04 and should be treated as current again.
+- Other legacy docs may still contain mojibake; check `docs/README.md` before relying on them.
 
 ### DOM UI Migration
 
@@ -209,23 +303,46 @@ Relevant code:
 
 ## Recent Uncommitted Changes
 
-At the time this handoff was written, `git status --short` showed:
+At the time this handoff was originally written, `git status --short` showed older enemy graphic work.
+
+As of 2026-06-04, current uncommitted work also includes later battle balance, DOM battle HUD notices, settings helpers, docs cleanup, and first-pass weapon enhancement. A recent `git status --short` showed:
 
 - Modified:
+  - `docs/current-state.md`
+  - `docs/ui-design-rules.md`
   - `src/data/enemies.ts`
+  - `src/data/stages.ts`
   - `src/main.ts`
+  - `src/objects/Bullet.ts`
   - `src/objects/Enemy.ts`
-  - `src/scenes/BootScene.ts`
+  - `src/scenes/BattleScene.ts`
+  - `src/scenes/BattleUIScene.ts`
   - `src/scenes/HomeScene.ts`
+  - `src/systems/SaveData.ts`
   - `src/types/index.ts`
-- New assets:
-  - `public/assets/enemy-blue-creature.png`
-  - `public/assets/enemy-green-creature.png`
-  - `public/assets/enemy-purple-creature.png`
-  - `public/assets/enemy-red-creature.png`
-  - `public/assets/enemy-white-creature.png`
+  - `src/ui/dom/BattleHudScreen.ts`
+  - `src/ui/dom/CharacterScreen.ts`
+  - `src/ui/dom/FileScreen.ts`
+  - `src/ui/dom/HomeShell.ts`
+  - `src/ui/dom/ShopScreen.ts`
+  - `src/ui/dom/styles.css`
+- New docs:
+  - `docs/README.md`
+  - `docs/legacy/plan.md`
+  - `docs/legacy/enemy-variation-plan.md`
+  - `docs/weapon-enhancement-design.md`
+- New code:
+  - `src/systems/EquipmentEnhancement.ts`
+- Moved to legacy:
+  - `plan.md`
+  - `enemy-variation-plan.md`
 
 These changes should be reviewed before any push.
+
+Latest verification:
+
+- `npm.cmd run build` passed after the first-pass weapon enhancement implementation and the equipped-item `E` marker change.
+- In-app browser automation could not be verified from Codex because the Node browser bridge repeatedly exited with `windows sandbox failed: spawn setup refresh`.
 
 ## Recent Enemy Graphic Work
 
@@ -245,43 +362,54 @@ Enemy image mapping:
 
 ## Current Open Issues
 
-1. DOM character/equipment and lobby standee changes should be checked visually by the user.
-   - Build passes.
-   - Browser automation was kept short; full manual visual checking is still recommended.
+1. `docs/stage-balance-design.md` should be restored or rewritten if it becomes important again.
+   - It still contains substantial mojibake.
+   - Current stage tuning should rely on code, recent playtest notes, and this file first.
 
-2. Debug overlay should be available through settings, not always visible.
+2. DOM character/equipment and lobby standee changes should be checked visually by the user when touched.
+   - Browser automation should stay short; full manual visual checking is often better for this project.
+
+3. Debug overlay should be available through settings, not always visible.
    - It currently exists and can be toggled by settings.
    - If URL has `debugCanvas=1`, it starts visible.
 
-3. UI standardization is still incomplete.
+4. UI standardization is still incomplete.
    - DOM standard list, edge button, empty state, drag scroll, shop dialog, result screen, portrait standee, level-up selection, and fixed battle HUD now exist.
    - Moving battle visuals still use Phaser by design.
    - Remaining visual work is mostly polish, not migration.
 
-4. Mobile visual sharpness is not fully solved.
+5. Mobile visual sharpness is not fully solved.
    - `resolution` and renderer changes did not fully solve blur.
    - Brave fallback solved CPU more than sharpness.
    - Root causes may include Phaser canvas scaling, browser viewport sizing, and rendering backend.
 
-5. Long Codex tool hangs have occurred repeatedly.
+6. Long Codex tool hangs have occurred repeatedly.
    - Some commands finish quickly but the Codex app appears stuck.
    - Avoid long browser automation.
    - Prefer small file reads, small patches, and immediate build polling.
 
+7. Battle balance is still in active iteration.
+   - Stage 30 around boss appearance is currently close to the desired challenge for character levels around 20.
+   - Enemy count, barricade DPS, stun/beam/blade behavior, and late-phase pressure still need careful incremental tuning.
+   - Avoid large balance rewrites without user confirmation.
+
 ## Recommended Next Thread Workflow
 
 1. Read this file first.
-2. Run:
+2. Read `docs/README.md` if you need to know which docs are current, legacy, or unreliable.
+3. If changing weapon enhancement, read `docs/weapon-enhancement-design.md`.
+4. Run:
    - `git status --short`
    - `npm.cmd run build`
-3. Do not start with browser automation.
-4. If continuing the current bug, inspect:
+5. Do not start with browser automation.
+6. If continuing a UI task, inspect existing DOM implementation before editing.
+7. If continuing the older Canvas/list bug, inspect:
    - `src/scenes/HomeScene.ts`
    - `supportsGeometryMask()`
    - `updateListClip()`
    - relevant list builder methods.
-5. Keep edits small.
-6. Let the user do visual checks unless browser testing is explicitly needed.
+8. Keep edits small.
+9. Let the user do visual checks unless browser testing is explicitly needed.
 
 ## User Communication Preference
 
@@ -298,6 +426,7 @@ Be direct:
 Avoid:
 
 - Long generic explanations.
-- “It should be fine” without evidence.
+- "It should be fine" without evidence.
 - Adding decorative UI elements not requested.
 - Repeating proposals the user already gave as if they are new.
+- Implementing brainstormed ideas before the user clearly asks for implementation.

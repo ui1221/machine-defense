@@ -54,6 +54,7 @@ export class HomeScene extends Phaser.Scene {
     this.homeShell = mountDomShell(root => mountHomeShell(root, {
       activeTab: this.activeTab,
       credits: this.save.credits,
+      junkParts: this.save.junkParts,
       onSelectTab: index => this.switchTab(index),
     })) as HomeShellHandle
     this.panels.forEach(panel => panel.setVisible(false))
@@ -164,7 +165,9 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private refreshTopStatus() {
-    this.homeShell?.setCredits(this.loadSave().credits)
+    const save = this.loadSave()
+    this.homeShell?.setCredits(save.credits)
+    this.homeShell?.setJunkParts(save.junkParts)
   }
 
   private buildBaseBackground() {

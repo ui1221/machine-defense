@@ -40,7 +40,10 @@ export interface EnemyConfig {
   description?: string
   hp: number
   speed: number       // px/s downward
-  damage: number      // barricade damage on contact
+  damage: number      // base barricade damage before scene scaling
+  firstAttackDelayMs?: number
+  attackCooldownMs?: number
+  attackJitterMs?: number
   expReward: number
   size: number        // collision radius
   color?: number
@@ -176,6 +179,13 @@ export interface GameSave {
   lastPlayedStageId?: string
   ownedWeapons: OwnedWeapon[]
   credits: number
+  junkParts: number
   upgrades: PermanentUpgrades
+  settings: GameSettings
   debugUnlockAllStages: boolean
+}
+
+export interface GameSettings {
+  enableQuadSpeed: boolean
+  enableAutoLevelUp: boolean
 }

@@ -8,7 +8,7 @@ import { stageBackgroundKey } from '../data/stageBackgrounds'
 import { applyRenderScale, logicalPointer } from '../utils/display'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { canEquipWeaponToCharacter, WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
+import { WEAPONS, RARITY_WEIGHTS } from '../data/weapons'
 import { Character } from '../objects/Character'
 import { Enemy } from '../objects/Enemy'
 import { Bullet } from '../objects/Bullet'
@@ -20,6 +20,7 @@ import { SpawnManager } from '../systems/SpawnManager'
 import { InputManager } from '../systems/InputManager'
 import { TargetingSystem } from '../systems/TargetingSystem'
 import { LevelUpManager } from '../systems/LevelUpManager'
+import { equipmentStatBonus } from '../systems/EquipmentEnhancement'
 import { UPGRADE_POOL } from '../data/upgrades'
 import { loadSave } from '../systems/SaveData'
 import type { StageConfig, BattleState, GameSave, CharacterDamageStat } from '../types'
@@ -46,17 +47,21 @@ export class BattleScene extends Phaser.Scene {
 
   private stage!: StageConfig
   private gameEnded = false
+  private resultPending = false
   private killCount = 0
   private droppedWeapons: string[] = []
   private damageZones: DamageZone[] = []
   private beamZones: BeamZone[] = []
   private orbFields: OrbField[] = []
   private damageByCharacter = new Map<string, number>()
+  private phaseFrame?: Phaser.GameObjects.Graphics
+  private lastAnnouncedPhase: 'none' | 'mid' | 'late' | 'boss' = 'none'
   elapsedMs = 0
   private pausedByUser = false
   private speedIndex = 0
   private expMult = 1
-  private readonly speedOptions = [1, 2]
+  private speedOptions = [1, 2]
+  private autoLevelUp = false
 
   constructor() { super('BattleScene') }
 
@@ -64,28 +69,35 @@ export class BattleScene extends Phaser.Scene {
     this.stage = STAGES.find(s => s.id === data.stageId) ?? STAGES[0]
     this.characters = []
     this.gameEnded = false
+    this.resultPending = false
     this.killCount = 0
     this.droppedWeapons = []
     this.damageZones = []
     this.beamZones = []
     this.orbFields = []
     this.damageByCharacter = new Map()
+    this.lastAnnouncedPhase = 'none'
     this.elapsedMs = 0
     this.pausedByUser = false
     this.speedIndex = 0
     this.expMult = 1
+    this.speedOptions = [1, 2]
+    this.autoLevelUp = false
   }
 
   create() {
     applyRenderScale(this)
     // 背景は後から画像に差し替えやすいよう、戦場・防衛帯・足元で分けておく。
     this.buildBattleBackground()
+    this.createPhaseAtmosphere()
     this.add.rectangle(GAME_W / 2, BARRICADE_Y - 42, GAME_W - 28, 4, 0x293149, 0.9).setDepth(1)
     this.enemies = this.add.group({ runChildUpdate: false })
     this.bullets = this.add.group({ runChildUpdate: false })
 
     const save = this.loadSave()
     this.expMult = 1 + save.upgrades.researchExpLevel * 0.04
+    this.speedOptions = save.settings.enableQuadSpeed ? [1, 2, 4] : [1, 2]
+    this.autoLevelUp = save.settings.enableAutoLevelUp
     this.barricade = new Barricade(this, DEFAULT_BARRICADE_HP + save.upgrades.barricadeHpLevel * 5 + save.upgrades.researchBarricadeLevel * 50)
     this.spawnManager = new SpawnManager(this.stage)
     this.inputManager = new InputManager(this)
@@ -152,6 +164,12 @@ export class BattleScene extends Phaser.Scene {
     this.add.rectangle(GAME_W / 2, (BARRICADE_Y - 34) / 2, GAME_W, BARRICADE_Y - 34, 0x141726).setDepth(0)
   }
 
+  private createPhaseAtmosphere() {
+    this.phaseFrame = this.add.graphics()
+      .setDepth(6)
+      .setBlendMode(Phaser.BlendModes.ADD)
+  }
+
   addCharacter(charId: string) {
     if (this.characters.length >= this.stageMaxCharacters) return
     if (charId === 'rapid') charId = 'assault'
@@ -179,6 +197,7 @@ export class BattleScene extends Phaser.Scene {
     const scaledDelta = delta * this.currentSpeed
     this.elapsedMs += scaledDelta
     const now = this.elapsedMs
+    this.updatePhaseAtmosphere(now)
     const enemyList = this.enemies.getChildren() as Enemy[]
     const bulletList = this.bullets.getChildren() as Bullet[]
 
@@ -188,9 +207,10 @@ export class BattleScene extends Phaser.Scene {
       const baseCfg = ENEMIES[entry.enemyId]
       if (!baseCfg) continue
       const hpMult = (this.stage.enemyHpMult ?? 1) * (entry.hpMult ?? 1)
-      const cfg = hpMult !== 1
-        ? { ...baseCfg, hp: Math.max(1, Math.round(baseCfg.hp * hpMult)) }
-        : baseCfg
+      const cfg = {
+        ...baseCfg,
+        hp: Math.max(1, Math.round(baseCfg.hp * hpMult)),
+      }
       const cx = this.pickSpawnCenter(entry.spread)
       for (let i = 0; i < entry.count; i++) {
         const clampedX = this.pickSpawnX(cx, entry.spread, entry.count)
@@ -209,7 +229,7 @@ export class BattleScene extends Phaser.Scene {
       for (const e of enemyList) {
         if (!e.active) continue
         if (zone.containsPoint(e.x, e.y)) {
-          e.speedMult = Math.min(e.speedMult, zone.slowFactor)
+          e.applySpeedSlow(zone.slowFactor)
           if (zone.shouldTick) {
             const rolled = this.rollCharacterDamage(zone.ownerId, zone.damagePerTick)
             const dead = e.takeDamage(rolled.damage)
@@ -239,7 +259,7 @@ export class BattleScene extends Phaser.Scene {
       orb.update(now, scaledDelta)
       for (const e of enemyList) {
         if (!e.active || !orb.containsEnemy(e)) continue
-        e.speedMult = Math.min(e.speedMult, orb.slowFactor)
+        e.applySpeedSlow(orb.slowFactor)
         if (!orb.shouldTick) continue
         const rolled = this.rollCharacterDamage(orb.ownerId, orb.damagePerTick)
         const dead = e.takeDamage(rolled.damage)
@@ -382,14 +402,14 @@ export class BattleScene extends Phaser.Scene {
     for (const e of enemyList) {
       if (!e.active) continue
       if (e.tryAttackBarricade(now)) {
-        const damage = Math.max(1, Math.ceil(e.damage * 0.2))
+        const damage = Math.max(0.2, e.damage * 0.2)
         const destroyed = this.barricade.takeDamage(damage, this)
         if (destroyed) { this.endGame(false); return }
       }
     }
 
     const activeEnemies = enemyList.filter(e => e.active)
-    if (this.spawnManager.allSpawned && activeEnemies.length === 0) {
+    if (!this.resultPending && this.spawnManager.allSpawned && activeEnemies.length === 0) {
       this.endGame(true)
     }
 
@@ -653,35 +673,56 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private showBossArrival(name: string) {
-    const band = this.add.rectangle(GAME_W / 2, 130, GAME_W - 36, 58, 0x2b120f, 0.88)
-      .setStrokeStyle(2, 0xff9955)
-      .setDepth(40)
-    const title = this.add.text(GAME_W / 2, 118, 'BOSS APPROACH', {
-      fontSize: '24px',
-      color: '#ffcc88',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(41)
-    const sub = this.add.text(GAME_W / 2, 143, name, {
-      fontSize: '15px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(41)
+    this.events.emit('bossArrival', name)
+  }
 
-    this.tweens.add({
-      targets: [band, title, sub],
-      alpha: 0,
-      delay: 1100,
-      duration: 700,
-      onComplete: () => {
-        band.destroy()
-        title.destroy()
-        sub.destroy()
-      },
-    })
+  private updatePhaseAtmosphere(now: number) {
+    const phase = this.currentBattlePhase(now / 1000)
+    const damageRatio = this.barricade ? 1 - this.barricade.hp / this.barricade.maxHp : 0
+    this.setPhaseAtmosphere(damageRatio)
+
+    if (phase === this.lastAnnouncedPhase) return
+    this.lastAnnouncedPhase = phase
+    if (phase === 'none') return
+    this.events.emit('phaseChanged', phase)
+  }
+
+  private currentBattlePhase(timeSec: number): 'none' | 'mid' | 'late' | 'boss' {
+    const stageNo = Number(this.stage.id.replace('stage_', '')) || 1
+    if (stageNo < 20) return 'none'
+
+    const bossEntry = this.stage.spawnTable.find(entry => entry.enemyId === 'boss_siege')
+    if (bossEntry && timeSec >= bossEntry.time - 25) {
+      return 'boss'
+    }
+    if (timeSec >= 240) return 'late'
+    if (timeSec >= 160) return 'mid'
+    return 'none'
+  }
+
+  private setPhaseAtmosphere(damageRatio = 0) {
+    if (!this.phaseFrame) return
+
+    this.phaseFrame.clear()
+    const damageAlpha = Phaser.Math.Clamp(damageRatio * 0.2, 0, 0.18)
+    if (damageAlpha > 0.01) this.drawPhaseFrame(0xff2222, damageAlpha)
+  }
+
+  private drawPhaseFrame(color: number, alpha: number) {
+    if (!this.phaseFrame || alpha <= 0) return
+
+    const steps = 8
+    const step = 6
+    for (let i = 0; i < steps; i += 1) {
+      const inset = i * step
+      const thick = step
+      const a = alpha * (1 - i / steps) ** 1.7
+      this.phaseFrame.fillStyle(color, a)
+      this.phaseFrame.fillRect(inset, inset, GAME_W - inset * 2, thick)
+      this.phaseFrame.fillRect(inset, GAME_H - inset - thick, GAME_W - inset * 2, thick)
+      this.phaseFrame.fillRect(inset, inset + thick, thick, GAME_H - (inset + thick) * 2)
+      this.phaseFrame.fillRect(GAME_W - inset - thick, inset + thick, thick, GAME_H - (inset + thick) * 2)
+    }
   }
 
   private showDamageNumber(x: number, y: number, damage: number, color = 0xffffff, crit = false) {
@@ -753,6 +794,11 @@ export class BattleScene extends Phaser.Scene {
     this.inputManager.pause()
     const state = this.buildBattleState()
     const choices = this.levelUpManager.pickChoices(state)
+    if (this.autoLevelUp) {
+      const firstChoice = choices[0]
+      if (firstChoice) this.applyUpgrade(firstChoice.id)
+      return
+    }
     this.events.emit('levelUp', choices)
   }
 
@@ -771,20 +817,12 @@ export class BattleScene extends Phaser.Scene {
 
   private applyEquippedWeapon(ch: Character) {
     const save = this.loadSave()
-    const equippedItems = save.ownedWeapons.filter(w => w.equippedCharId === ch.config.id)
-    for (const equipped of equippedItems) {
-      const weapon = WEAPONS[equipped.weaponId]
-      if (!weapon) continue
-      if (!canEquipWeaponToCharacter(weapon, ch.config.id)) continue
-      const levelBonus = 1 + equipped.level * 0.1
-      const bonus = levelBonus * (1 + save.upgrades.equipmentLevel * 0.03)
-      if (weapon.atkMult !== 1)      ch.atkMult      *= 1 + (weapon.atkMult - 1) * bonus
-      if (weapon.atkSpeedMult < 1)   ch.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
-      if (weapon.atkSpeedMult > 1)   ch.atkSpeedMult *= weapon.atkSpeedMult
-      if (weapon.rangeMult !== 1)    ch.rangeMult    *= 1 + (weapon.rangeMult - 1) * bonus
-      if (weapon.areaMult && weapon.areaMult !== 1) ch.areaMult *= 1 + (weapon.areaMult - 1) * bonus
-      if (weapon.critChance > 0)     ch.critChance   += weapon.critChance * bonus
-    }
+    const bonus = equipmentStatBonus(save, ch.config.id)
+    ch.atkMult *= bonus.atkMult
+    ch.atkSpeedMult *= bonus.atkSpeedMult
+    ch.rangeMult *= bonus.rangeMult
+    ch.areaMult *= bonus.areaMult
+    ch.critChance += bonus.critAdd
   }
 
   private applyPermanentUpgrade(ch: Character) {
@@ -885,9 +923,26 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private endGame(victory: boolean) {
-    if (this.gameEnded) return
+    if (this.gameEnded || this.resultPending) return
+    this.resultPending = true
+    if (victory) {
+      this.rollStageDrops()
+      this.inputManager.pause()
+      this.time.delayedCall(800, () => {
+        this.gameEnded = true
+        this.scene.stop('BattleUIScene')
+        this.scene.start('ResultScene', {
+          victory, stageId: this.stage.id,
+          killCount: this.killCount,
+          level: this.levelUpManager.level,
+          droppedWeapons: this.droppedWeapons,
+          damageStats: this.buildDamageStats(),
+        })
+      })
+      return
+    }
+
     this.gameEnded = true
-    if (victory) this.rollStageDrops()
     this.inputManager.pause()
     this.time.delayedCall(800, () => {
       this.scene.stop('BattleUIScene')

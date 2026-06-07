@@ -1,6 +1,7 @@
 import { ENEMIES } from '../../data/enemies'
 import { WEAPONS } from '../../data/weapons'
 import { loadSave } from '../../systems/SaveData'
+import { equipmentDisplayName } from '../../systems/EquipmentEnhancement'
 import { edgeButton, emptyState, listRow, scrollList } from './components'
 import type { DomScreen } from './mount'
 
@@ -99,7 +100,7 @@ export function mountFileScreen(root: HTMLElement, opts: FileScreenOptions): Dom
       list.append(listRow({
         icon: weapon.emoji,
         iconColor: slotColor(weapon.slot),
-        title: `${weapon.name}${owned.level > 0 ? ` +${owned.level}` : ''}`,
+        title: equipmentDisplayName(weapon.name, owned.level),
         detail: weapon.description,
         meta: weapon.rarity,
       }))

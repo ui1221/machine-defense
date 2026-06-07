@@ -1,13 +1,16 @@
+import { loadSave, saveGame } from '../../systems/SaveData'
 import type { DomScreen } from './mount'
 
 export interface HomeShellHandle extends DomScreen {
   setActiveTab: (index: number) => void
   setCredits: (credits: number) => void
+  setJunkParts: (junkParts: number) => void
 }
 
 export interface HomeShellOptions {
   activeTab: number
   credits: number
+  junkParts: number
   onSelectTab: (index: number) => void
 }
 
@@ -43,7 +46,16 @@ export function mountHomeShell(root: HTMLElement, opts: HomeShellOptions): HomeS
   creditText.className = 'md-top-credits__value'
   creditText.textContent = `${opts.credits}`
   credits.append(coin, creditText)
-  status.append(face, credits)
+
+  const junk = document.createElement('div')
+  junk.className = 'md-top-credits md-top-credits--junk'
+  const junkIcon = document.createElement('span')
+  junkIcon.className = 'md-top-credits__coin md-top-credits__coin--junk'
+  const junkText = document.createElement('span')
+  junkText.className = 'md-top-credits__value'
+  junkText.textContent = `${opts.junkParts}`
+  junk.append(junkIcon, junkText)
+  status.append(face, credits, junk)
 
   const settings = document.createElement('button')
   settings.className = 'md-top-settings'
@@ -101,7 +113,26 @@ export function mountHomeShell(root: HTMLElement, opts: HomeShellOptions): HomeS
 
     const menu = document.createElement('div')
     menu.className = 'md-settings-menu'
+    const save = loadSave()
     menu.append(
+      settingsButton({
+        icon: '4x',
+        title: '4倍速',
+        desc: save.settings.enableQuadSpeed ? 'ON  戦闘中にx4まで切り替える' : 'OFF  戦闘速度はx2まで',
+        onClick: () => {
+          toggleSetting('enableQuadSpeed')
+          renderSettings()
+        },
+      }),
+      settingsButton({
+        icon: 'AUTO',
+        title: '自動レベルアップ',
+        desc: save.settings.enableAutoLevelUp ? 'ON  候補の先頭を自動選択する' : 'OFF  レベルアップ時に手動選択する',
+        onClick: () => {
+          toggleSetting('enableAutoLevelUp')
+          renderSettings()
+        },
+      }),
       settingsButton({
         icon: isCanvasDebugVisible() ? '●' : '○',
         title: 'デバッグ表示',
@@ -110,6 +141,18 @@ export function mountHomeShell(root: HTMLElement, opts: HomeShellOptions): HomeS
           ;(window as any).__setCanvasDebugVisible?.(!isCanvasDebugVisible())
           renderSettings()
         },
+      }),
+      settingsButton({
+        icon: '↑',
+        title: 'セーブコピー',
+        desc: '現在のセーブJSONをクリップボードへコピー',
+        onClick: () => copySaveData(overlay),
+      }),
+      settingsButton({
+        icon: '↓',
+        title: 'セーブ復元',
+        desc: 'コピーしたセーブJSONを貼り付けて復元',
+        onClick: () => showSaveImportDialog(overlay),
       }),
       settingsButton({
         icon: '<',
@@ -143,6 +186,9 @@ export function mountHomeShell(root: HTMLElement, opts: HomeShellOptions): HomeS
     setCredits: nextCredits => {
       creditText.textContent = `${nextCredits}`
     },
+    setJunkParts: nextJunkParts => {
+      junkText.textContent = `${nextJunkParts}`
+    },
     destroy: () => shell.remove(),
   }
 }
@@ -163,6 +209,102 @@ function settingsButton(opts: { icon: string; title: string; desc: string; onCli
   desc.className = 'md-settings-button__desc'
   desc.textContent = opts.desc
   button.append(icon, title, desc)
+  return button
+}
+
+function toggleSetting(key: 'enableQuadSpeed' | 'enableAutoLevelUp') {
+  const save = loadSave()
+  save.settings[key] = !save.settings[key]
+  saveGame(save)
+}
+
+async function copySaveData(root: HTMLElement) {
+  const text = JSON.stringify(loadSave())
+  try {
+    await navigator.clipboard.writeText(text)
+    showSaveMessage(root, 'セーブをコピーしました。')
+  } catch {
+    showSaveTextDialog(root, 'セーブコピー', text)
+  }
+}
+
+function showSaveImportDialog(root: HTMLElement) {
+  showSaveTextDialog(root, 'セーブ復元', '', value => {
+    const parsed = JSON.parse(value)
+    saveGame(parsed)
+    location.reload()
+  })
+}
+
+function showSaveMessage(root: HTMLElement, text: string) {
+  const dialog = saveDialog('セーブ管理')
+  const body = document.createElement('p')
+  body.className = 'md-save-dialog__message'
+  body.textContent = text
+  const actions = document.createElement('div')
+  actions.className = 'md-save-dialog__actions'
+  actions.append(saveDialogButton('閉じる', () => dialog.remove(), true))
+  dialog.querySelector('.md-save-dialog')?.append(body, actions)
+  root.append(dialog)
+}
+
+function showSaveTextDialog(root: HTMLElement, title: string, initialValue: string, onApply?: (value: string) => void) {
+  const dialog = saveDialog(title)
+  const body = dialog.querySelector('.md-save-dialog')
+  if (!body) return
+
+  const textarea = document.createElement('textarea')
+  textarea.className = 'md-save-dialog__textarea'
+  textarea.value = initialValue
+  textarea.placeholder = 'ここにセーブJSONを貼り付け'
+  textarea.spellcheck = false
+
+  const error = document.createElement('div')
+  error.className = 'md-save-dialog__error'
+
+  const actions = document.createElement('div')
+  actions.className = 'md-save-dialog__actions'
+  actions.append(
+    saveDialogButton(onApply ? '復元' : '選択', () => {
+      if (!onApply) {
+        textarea.focus()
+        textarea.select()
+        return
+      }
+      try {
+        onApply(textarea.value.trim())
+      } catch {
+        error.textContent = 'セーブJSONを読み込めません。内容を確認してください。'
+      }
+    }),
+    saveDialogButton('閉じる', () => dialog.remove(), true),
+  )
+
+  body.append(textarea, error, actions)
+  root.append(dialog)
+  textarea.focus()
+  if (initialValue) textarea.select()
+}
+
+function saveDialog(titleText: string) {
+  const overlay = document.createElement('div')
+  overlay.className = 'md-save-dialog-overlay'
+  const dialog = document.createElement('div')
+  dialog.className = 'md-save-dialog'
+  const title = document.createElement('div')
+  title.className = 'md-save-dialog__title'
+  title.textContent = titleText
+  dialog.append(title)
+  overlay.append(dialog)
+  return overlay
+}
+
+function saveDialogButton(label: string, onClick: () => void, quiet = false) {
+  const button = document.createElement('button')
+  button.className = quiet ? 'md-save-dialog__button is-quiet' : 'md-save-dialog__button'
+  button.type = 'button'
+  button.textContent = label
+  button.addEventListener('click', onClick)
   return button
 }
 

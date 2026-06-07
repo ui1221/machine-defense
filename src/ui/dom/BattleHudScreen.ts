@@ -12,7 +12,11 @@ export interface BattleHudState {
 
 export interface BattleHudScreenHandle extends DomScreen {
   setState: (state: BattleHudState) => void
+  showPhaseNotice: (phase: BattlePhase) => void
+  showBossNotice: (name: string) => void
 }
+
+export type BattlePhase = 'mid' | 'late' | 'boss'
 
 export interface BattleHudScreenOptions {
   onTogglePause: () => void
@@ -42,8 +46,18 @@ export function mountBattleHudScreen(root: HTMLElement, opts: BattleHudScreenOpt
   const hp = hudBar('BARRIER', 'md-hud-bar is-hp')
   hp.wrap.classList.add('md-battle-hud__hp')
 
-  hud.append(top, controls, hp.wrap)
+  const phaseNotice = document.createElement('div')
+  phaseNotice.className = 'md-phase-notice'
+  const phaseTitle = document.createElement('div')
+  phaseTitle.className = 'md-phase-notice__title'
+  const phaseSub = document.createElement('div')
+  phaseSub.className = 'md-phase-notice__sub'
+  phaseNotice.append(phaseTitle, phaseSub)
+
+  hud.append(top, controls, hp.wrap, phaseNotice)
   root.append(hud)
+
+  let phaseTimer: number | undefined
 
   return {
     setState: state => {
@@ -53,15 +67,42 @@ export function mountBattleHudScreen(root: HTMLElement, opts: BattleHudScreenOpt
       time.textContent = formatTime(state.elapsedMs)
       exp.value.textContent = `${Math.round(expRatio * 100)}%`
       exp.fill.style.width = `${expRatio * 100}%`
-      hp.value.textContent = `${state.hp}/${state.maxHp}`
+      hp.value.textContent = `${Math.ceil(state.hp)}/${Math.round(state.maxHp)}`
       hp.fill.style.width = `${hpRatio * 100}%`
       hp.wrap.classList.toggle('is-warning', hpRatio <= 0.5 && hpRatio > 0.25)
       hp.wrap.classList.toggle('is-critical', hpRatio <= 0.25)
       pause.textContent = state.paused ? '>' : 'II'
       speed.textContent = `x${state.speed}`
     },
-    destroy: () => hud.remove(),
+    showPhaseNotice: phase => {
+      const meta = phaseNoticeMeta[phase]
+      showNotice(`is-${phase}`, meta.title, meta.sub, 1400)
+    },
+    showBossNotice: name => {
+      showNotice('is-boss-arrival', 'BOSS APPROACH', name, 1900)
+    },
+    destroy: () => {
+      if (phaseTimer) window.clearTimeout(phaseTimer)
+      hud.remove()
+    },
   }
+
+  function showNotice(className: string, title: string, sub: string, duration: number) {
+    if (phaseTimer) window.clearTimeout(phaseTimer)
+    phaseNotice.className = `md-phase-notice ${className} is-visible`
+    phaseTitle.textContent = title
+    phaseSub.textContent = sub
+    phaseTimer = window.setTimeout(() => {
+      phaseNotice.classList.remove('is-visible')
+      phaseTimer = undefined
+    }, duration)
+  }
+}
+
+const phaseNoticeMeta: Record<BattlePhase, { title: string; sub: string }> = {
+  mid: { title: 'RESISTANCE RISING', sub: '\u6575\u306e\u62b5\u6297\u304c\u5897\u3057\u3066\u304d\u305f' },
+  late: { title: 'PRESSURE ESCALATING', sub: '\u6575\u52e2\u529b\u304c\u653b\u52e2\u3092\u5f37\u3081\u3066\u3044\u308b' },
+  boss: { title: 'FINAL PRESSURE', sub: '\u5236\u5727\u500b\u4f53\u304c\u6226\u5834\u3092\u62bc\u3057\u8fbc\u3093\u3067\u3044\u308b' },
 }
 
 function hudBar(labelText: string, className: string) {

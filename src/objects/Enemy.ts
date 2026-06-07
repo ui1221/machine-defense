@@ -2,9 +2,9 @@ import Phaser from 'phaser'
 import type { EnemyConfig } from '../types'
 import { BARRICADE_Y, SPAWN_Y } from '../constants'
 
-const ATTACK_DELAY = 1600
-const ATTACK_COOLDOWN = 3600
-const ATTACK_INTERRUPT_DELAY = ATTACK_DELAY
+const DEFAULT_FIRST_ATTACK_DELAY_MS = 2000
+const DEFAULT_ATTACK_COOLDOWN_MS = 4400
+const DEFAULT_ATTACK_JITTER_MS = 650
 const HEAL_INTERVAL = 2400
 const HEAL_RADIUS = 92
 const HEAL_AMOUNT = 5
@@ -108,7 +108,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     if (this.y >= BARRICADE_Y - 20) {
       this.y = BARRICADE_Y - 20
       this.atBarricade = true
-      this.nextAttackReadyTime = t + ATTACK_DELAY
+      this.nextAttackReadyTime = t + this.firstAttackDelayMs + this.rollAttackJitter()
       this.attackWarningShown = false
     }
   }
@@ -126,6 +126,10 @@ export class Enemy extends Phaser.GameObjects.Container {
     }
   }
 
+  applySpeedSlow(factor: number) {
+    this.speedMult = Math.min(this.speedMult, this.adjustSlowFactor(factor))
+  }
+
   tryAttackBarricade(now: number): boolean {
     if (!this.atBarricade) return false
     if (this.hasAbility('warning_attack') && !this.attackWarningShown && now >= this.nextAttackReadyTime - 350) {
@@ -134,7 +138,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     }
     if (now < this.nextAttackReadyTime) return false
 
-    this.nextAttackReadyTime = now + ATTACK_COOLDOWN
+    this.nextAttackReadyTime = now + this.attackCooldownMs + this.rollAttackJitter()
     this.attackWarningShown = false
 
     // 攻撃アニメーション
@@ -151,8 +155,24 @@ export class Enemy extends Phaser.GameObjects.Container {
   private interruptBarricadeAttack() {
     if (!this.atBarricade) return
     const now = (this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now
-    this.nextAttackReadyTime = Math.max(this.nextAttackReadyTime, now + ATTACK_INTERRUPT_DELAY)
+    this.nextAttackReadyTime = Math.max(this.nextAttackReadyTime, now + this.firstAttackDelayMs + this.rollAttackJitter())
     this.attackWarningShown = false
+  }
+
+  private get firstAttackDelayMs() {
+    return this.config.firstAttackDelayMs ?? DEFAULT_FIRST_ATTACK_DELAY_MS
+  }
+
+  private get attackCooldownMs() {
+    return this.config.attackCooldownMs ?? DEFAULT_ATTACK_COOLDOWN_MS
+  }
+
+  private get attackJitterMs() {
+    return this.config.attackJitterMs ?? DEFAULT_ATTACK_JITTER_MS
+  }
+
+  private rollAttackJitter() {
+    return Math.random() * this.attackJitterMs
   }
 
   tryHealNearby(now: number, allies: Enemy[]): boolean {
@@ -209,8 +229,8 @@ export class Enemy extends Phaser.GameObjects.Container {
   slow(until: number, factor: number) {
     if (this.hasAbility('boss')) {
       const now = (this.scene as { elapsedMs?: number }).elapsedMs ?? this.scene.time.now
-      until = now + Math.max(0, until - now) * 0.35
-      factor = Math.max(factor, 0.84)
+      until = now + Math.max(0, until - now) * 0.2
+      factor = this.adjustSlowFactor(factor)
     }
     this.slowedUntil = Math.max(this.slowedUntil, until)
     this.persistentSlowFactor = Math.min(this.persistentSlowFactor, factor)
@@ -232,6 +252,10 @@ export class Enemy extends Phaser.GameObjects.Container {
     if (this.hasAbility('armor')) mult *= 0.65
     if (this.hasAbility('elite')) mult *= 0.8
     return Math.max(1, Math.round(amount * mult))
+  }
+
+  private adjustSlowFactor(factor: number) {
+    return this.hasAbility('boss') ? Math.max(factor, 0.92) : factor
   }
 
   private updateSpecialMovement() {

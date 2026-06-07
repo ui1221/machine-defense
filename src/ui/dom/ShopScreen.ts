@@ -1,6 +1,13 @@
 import { RESEARCH_ITEMS, type ResearchItem } from '../../data/research'
 import { RARITY_COLORS, WEAPONS } from '../../data/weapons'
 import { loadSave, saveGame } from '../../systems/SaveData'
+import {
+  enhancementMaxLevel,
+  equipmentDisplayName,
+  isEnhanceableEquipment,
+  nextEnhancementCost,
+  sellJunkParts,
+} from '../../systems/EquipmentEnhancement'
 import type { EquipmentSlot, GameSave, OwnedWeapon } from '../../types'
 import { edgeButton, emptyState, listRow, scrollList } from './components'
 import type { DomScreen } from './mount'
@@ -90,6 +97,7 @@ export function mountShopScreen(root: HTMLElement, opts: ShopScreenOptions): Dom
     const list = scrollList()
     if (nextMode === 'buy') renderBuy(list)
     else if (nextMode === 'sell') renderSell(list)
+    else if (nextMode === 'upgrade') renderUpgrade(list)
     else if (nextMode === 'research') renderResearch(list)
     else list.append(emptyState('この項目は次に実装します。'))
 
@@ -153,22 +161,69 @@ export function mountShopScreen(root: HTMLElement, opts: ShopScreenOptions): Dom
       const weapon = WEAPONS[owned.weaponId]
       if (!weapon) return
       const price = sellPrice(owned)
+      const junk = sellJunkParts(owned)
       list.append(listRow({
         icon: weapon.emoji,
         iconColor: rarityColor(weapon.rarity),
         title: equipmentDisplayName(weapon.name, owned.level),
         detail: compactEquipmentDescription(weapon.description),
-        meta: `${price} CREDIT`,
+        meta: `${price} CREDIT + ${junk} JUNK`,
         onClick: () => showConfirm(
-          `${equipmentDisplayName(weapon.name, owned.level)}\n${price} CREDIT で売却します。`,
+          `${equipmentDisplayName(weapon.name, owned.level)}\n${price} CREDIT + ${junk} JUNK で売却します。`,
           () => {
             const current = loadSave()
             const target = current.ownedWeapons.find(w => w.uid === owned.uid)
             if (!target || target.equippedCharId) return
             current.ownedWeapons = current.ownedWeapons.filter(w => w.uid !== owned.uid)
             current.credits += sellPrice(target)
+            current.junkParts += sellJunkParts(target)
             saveGame(current)
             rerenderAfterSave()
+          },
+        ),
+      }))
+    })
+  }
+
+  const renderUpgrade = (list: HTMLElement) => {
+    const save = loadSave()
+    const items = save.ownedWeapons
+      .filter(owned => WEAPONS[owned.weaponId] && isEnhanceableEquipment(owned))
+      .sort((a, b) => {
+        const aw = WEAPONS[a.weaponId]
+        const bw = WEAPONS[b.weaponId]
+        if (!aw || !bw) return a.weaponId.localeCompare(b.weaponId)
+        const rarityDiff = rarityOrder[aw.rarity] - rarityOrder[bw.rarity]
+        if (rarityDiff !== 0) return rarityDiff
+        return aw.name.localeCompare(bw.name, 'ja')
+      })
+
+    if (items.length === 0) {
+      list.append(emptyState('強化できる武器はありません。'))
+      return
+    }
+
+    items.forEach(owned => {
+      const weapon = WEAPONS[owned.weaponId]
+      if (!weapon) return
+      const maxLevel = enhancementMaxLevel(owned)
+      const currentLevel = Math.min(owned.level, maxLevel)
+      const maxed = currentLevel >= maxLevel
+      const cost = nextEnhancementCost(currentLevel)
+      const canEnhance = !maxed && save.junkParts >= cost
+      const equipMark = owned.equippedCharId ? 'E ' : ''
+      list.append(listRow({
+        icon: weapon.emoji,
+        iconColor: rarityColor(weapon.rarity),
+        title: equipmentDisplayName(weapon.name, currentLevel),
+        subTitle: `${equipMark}+${currentLevel}/+${maxLevel}`,
+        detail: compactEquipmentDescription(weapon.description),
+        meta: maxed ? 'MAX' : `${cost} JUNK`,
+        disabled: !canEnhance,
+        onClick: () => showConfirm(
+          `${equipmentDisplayName(weapon.name, currentLevel)}\n+${currentLevel} -> +${currentLevel + 1}\n${cost} JUNK で強化します。`,
+          () => {
+            if (enhanceEquipment(owned.uid, cost, maxLevel)) rerenderAfterSave()
           },
         ),
       }))
@@ -267,7 +322,7 @@ function sellPrice(owned: OwnedWeapon) {
   if (!weapon) return 0
   const rarityBase = weapon.rarity === 'N' ? 10 : weapon.rarity === 'R' ? 100 : weapon.rarity === 'SR' ? 1000 : 5000
   const slotMult = weapon.slot === 'core' ? 1.1 : weapon.slot === 'module' ? 0.9 : 1
-  return Math.max(1, Math.round(rarityBase * slotMult * (1 + owned.level * 0.25)))
+  return Math.max(1, Math.round(rarityBase * slotMult))
 }
 
 function buyPrice(weaponId: string) {
@@ -305,8 +360,16 @@ function resetResearch(refund: number) {
   return true
 }
 
-function equipmentDisplayName(name: string, level: number) {
-  return level > 0 ? `${name}+${level}` : name
+function enhanceEquipment(uid: string, cost: number, maxLevel: number) {
+  const save = loadSave()
+  const target = save.ownedWeapons.find(w => w.uid === uid)
+  if (!target || !isEnhanceableEquipment(target)) return false
+  const currentLevel = Math.min(target.level, maxLevel)
+  if (currentLevel >= maxLevel || save.junkParts < cost) return false
+  save.junkParts -= cost
+  target.level = currentLevel + 1
+  saveGame(save)
+  return true
 }
 
 function compactEquipmentDescription(description: string) {
@@ -329,3 +392,5 @@ const slotOrder: Record<EquipmentSlot, number> = {
   sensor: 2,
   module: 3,
 }
+
+const rarityOrder = { N: 0, R: 1, SR: 2, SSR: 3 }

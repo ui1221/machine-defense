@@ -34,6 +34,8 @@ export class BattleUIScene extends Phaser.Scene {
     this.battle.events.on('expChanged', this.onUpdate, this)
     this.battle.events.on('levelUp', this.showLevelUpUI, this)
     this.battle.events.on('levelUpDone', this.hideLevelUpUI, this)
+    this.battle.events.on('phaseChanged', this.showPhaseNotice, this)
+    this.battle.events.on('bossArrival', this.showBossNotice, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroyDomUi())
 
     this.onUpdate()
@@ -68,6 +70,14 @@ export class BattleUIScene extends Phaser.Scene {
     this.onUpdate()
   }
 
+  private showPhaseNotice(phase: 'mid' | 'late' | 'boss') {
+    this.hud?.showPhaseNotice(phase)
+  }
+
+  private showBossNotice(name: string) {
+    this.hud?.showBossNotice(name)
+  }
+
   shutdown() {
     this.destroyDomUi()
   }
@@ -77,6 +87,8 @@ export class BattleUIScene extends Phaser.Scene {
     this.battle.events.off('expChanged', this.onUpdate, this)
     this.battle.events.off('levelUp', this.showLevelUpUI, this)
     this.battle.events.off('levelUpDone', this.hideLevelUpUI, this)
+    this.battle.events.off('phaseChanged', this.showPhaseNotice, this)
+    this.battle.events.off('bossArrival', this.showBossNotice, this)
     unmountDomScreen()
     unmountDomShell()
     this.hud = undefined

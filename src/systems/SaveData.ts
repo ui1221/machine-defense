@@ -1,4 +1,4 @@
-import type { GameSave, OwnedWeapon, PermanentUpgrades } from '../types'
+import type { GameSave, GameSettings, OwnedWeapon, PermanentUpgrades } from '../types'
 import { canEquipWeaponToCharacter, WEAPONS } from '../data/weapons'
 
 export const SAVE_KEY = 'td_save'
@@ -30,6 +30,11 @@ export const DEFAULT_UPGRADES: PermanentUpgrades = {
   researchRangeLevel: 0,
   researchProjectileLevel: 0,
   researchBarricadeLevel: 0,
+}
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  enableQuadSpeed: false,
+  enableAutoLevelUp: false,
 }
 
 export function loadSave(): GameSave {
@@ -89,6 +94,7 @@ export function normalizeSave(raw: Partial<GameSave>): GameSave {
     lastPlayedStageId: typeof raw.lastPlayedStageId === 'string' ? raw.lastPlayedStageId : undefined,
     ownedWeapons: Array.isArray(raw.ownedWeapons) ? raw.ownedWeapons.map(normalizeOwnedWeapon) : [],
     credits: typeof raw.credits === 'number' ? raw.credits : 0,
+    junkParts: typeof raw.junkParts === 'number' ? raw.junkParts : 0,
     upgrades: {
       ...DEFAULT_UPGRADES,
       ...rawUpgrades,
@@ -96,6 +102,10 @@ export function normalizeSave(raw: Partial<GameSave>): GameSave {
       assaultCooldownLevel,
       rapidAtkLevel: 0,
       rapidCooldownLevel: 0,
+    },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...raw.settings,
     },
     debugUnlockAllStages: raw.debugUnlockAllStages === true,
   }

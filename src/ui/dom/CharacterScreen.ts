@@ -1,6 +1,7 @@
 import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../../data/characters'
 import { canEquipWeaponToCharacter, equipmentSlotLabel, RARITY_COLORS, WEAPONS } from '../../data/weapons'
 import { loadSave, saveGame, upgradeCost } from '../../systems/SaveData'
+import { equipmentDisplayName, equipmentStatBonus } from '../../systems/EquipmentEnhancement'
 import type { EquipmentSlot, GameSave, OwnedWeapon } from '../../types'
 import { edgeButton, emptyState, listRow, scrollList } from './components'
 import type { DomScreen } from './mount'
@@ -283,23 +284,6 @@ function buyCharacterUpgrade(key: keyof GameSave['upgrades'], levelCap: number) 
   return true
 }
 
-function equipmentStatBonus(save: GameSave, charId: string) {
-  const result = { atkMult: 1, atkSpeedMult: 1, critAdd: 0 }
-  const equipmentBonus = 1 + save.upgrades.equipmentLevel * 0.03
-  for (const owned of save.ownedWeapons) {
-    if (owned.equippedCharId !== charId) continue
-    const weapon = WEAPONS[owned.weaponId]
-    if (!weapon || !canEquipWeaponToCharacter(weapon, charId)) continue
-    const levelBonus = 1 + owned.level * 0.1
-    const bonus = levelBonus * equipmentBonus
-    if (weapon.atkMult !== 1) result.atkMult *= 1 + (weapon.atkMult - 1) * bonus
-    if (weapon.atkSpeedMult < 1) result.atkSpeedMult *= 1 + (weapon.atkSpeedMult - 1) * bonus
-    if (weapon.atkSpeedMult > 1) result.atkSpeedMult *= weapon.atkSpeedMult
-    if (weapon.critChance > 0) result.critAdd += weapon.critChance * bonus
-  }
-  return result
-}
-
 function getEquippedBySlot(save: GameSave, charId: string) {
   const equipped = new Map<EquipmentSlot, OwnedWeapon>()
   for (const owned of save.ownedWeapons) {
@@ -338,10 +322,6 @@ function unequipCharacterWeapon(charId: string, slot: EquipmentSlot) {
 function formatStatBonus(value: number, digits: number) {
   if (Math.abs(value) < 0.005) return ''
   return value > 0 ? `+${value.toFixed(digits)}` : `-${Math.abs(value).toFixed(digits)}`
-}
-
-function equipmentDisplayName(name: string, level: number) {
-  return level > 0 ? `${name}+${level}` : name
 }
 
 function compactEquipmentDescription(description: string) {

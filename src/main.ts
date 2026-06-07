@@ -16,7 +16,7 @@ const requestedFpsLimit = Number(urlParams.get('fpsLimit') ?? 0)
 const fpsLimit = Number.isFinite(requestedFpsLimit)
   ? Phaser.Math.Clamp(Math.round(requestedFpsLimit), 0, 60)
   : 0
-const keepAwake = urlParams.has('keepAwake')
+const keepAwake = !urlParams.has('sleepOnBlur')
 const rendererParam = urlParams.get('renderer')
 const softwareRendererPattern = /swiftshader|basic render driver|software/i
 const probeWebGLRenderer = () => {

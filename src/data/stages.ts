@@ -671,8 +671,133 @@ function compressSpawnSchedule(stage: StageConfig, seconds: number): StageConfig
   }
 }
 
+function spreadBarricadeAssaultWaves(stage: StageConfig): StageConfig {
+  return {
+    ...stage,
+    spawnTable: stage.spawnTable.map(entry => {
+      if (entry.duration != null) return entry
+      if (entry.enemyId === 'breaker' && entry.count >= 10) {
+        return { ...entry, duration: Math.min(22, Math.max(8, Math.round(entry.count * 0.6))) }
+      }
+      if (entry.enemyId === 'striker' && entry.count >= 20) {
+        return { ...entry, duration: Math.min(20, Math.max(12, Math.round(entry.count * 0.55))) }
+      }
+      return entry
+    }),
+  }
+}
+
+function addLatcherPressure(stage: StageConfig): StageConfig {
+  const stageNo = Number(stage.id.replace('stage_', '')) || 1
+  if (stageNo < 14) return stage
+
+  return {
+    ...stage,
+    spawnTable: stage.spawnTable.flatMap(entry => {
+      if (entry.enemyId !== 'runner' || entry.count < 12) return [entry]
+
+      const latcherCount = Math.max(3, Math.round(entry.count * 0.35))
+      return [
+        entry,
+        {
+          time: Math.round((entry.time + 0.4) * 10) / 10,
+          enemyId: 'latcher',
+          count: latcherCount,
+          spread: entry.spread,
+          duration: Math.min(3, Math.max(1, Math.round(latcherCount * 0.18))),
+          hpMult: entry.hpMult,
+        },
+      ]
+    }),
+  }
+}
+
+function pullBossEscortsForward(stage: StageConfig): StageConfig {
+  const bossEntry = stage.spawnTable.find(entry => entry.enemyId === 'boss_siege')
+  if (!bossEntry) return stage
+
+  return {
+    ...stage,
+    spawnTable: stage.spawnTable.map(entry => {
+      const delay = entry.time - bossEntry.time
+      if (delay < 8 || delay > 44) return entry
+      return {
+        ...entry,
+        time: Math.max(1, Math.round((bossEntry.time - 4 + (delay - 8) * 0.5) * 10) / 10),
+        enemyId: ['mass', 'core', 'guard', 'breaker'].includes(entry.enemyId) ? 'elite' : entry.enemyId,
+      }
+    }),
+  }
+}
+
+function addBossVanguard(stage: StageConfig): StageConfig {
+  const bossEntry = stage.spawnTable.find(entry => entry.enemyId === 'boss_siege')
+  if (!bossEntry) return stage
+
+  const stageNo = Number(stage.id.replace('stage_', '')) || 1
+  const leadEnemyId = stageNo >= 20 ? 'core' : 'guard'
+  const leadCount = stageNo >= 25 ? 8 : stageNo >= 15 ? 6 : 4
+  const pressureCount = stageNo >= 25 ? 6 : stageNo >= 15 ? 4 : 0
+  const additions = [
+    {
+      time: Math.max(1, Math.round((bossEntry.time - 18) * 10) / 10),
+      enemyId: leadEnemyId,
+      count: leadCount,
+      spread: 300,
+      duration: 7,
+      hpMult: 0.85,
+    },
+  ]
+
+  if (pressureCount > 0) {
+    additions.push({
+      time: Math.max(1, Math.round((bossEntry.time - 10) * 10) / 10),
+      enemyId: 'elite',
+      count: pressureCount,
+      spread: 360,
+      duration: 6,
+      hpMult: 0.75,
+    })
+  }
+
+  return {
+    ...stage,
+    spawnTable: [...stage.spawnTable, ...additions].sort((a, b) => a.time - b.time),
+  }
+}
+
+function applyPhasePressure(stage: StageConfig): StageConfig {
+  const stageNo = Number(stage.id.replace('stage_', '')) || 1
+  if (stageNo < 20) return stage
+  const bossEntry = stage.spawnTable.find(entry => entry.enemyId === 'boss_siege')
+
+  return {
+    ...stage,
+    spawnTable: stage.spawnTable.map(entry => {
+      const bossWindow = bossEntry != null && entry.time >= bossEntry.time - 25 && entry.time <= bossEntry.time + 35
+      const mid = entry.time >= 160 && entry.time < 240
+      const late = entry.time >= 240
+      if (!bossWindow && !mid && !late) return entry
+
+      const lateIntensity = Math.min(1, Math.max(0, (stageNo - 20) / 10))
+      const phaseHpMult = bossWindow ? 1.22 + lateIntensity * 0.03
+        : mid ? 1.05
+          : 1.12
+
+      return {
+        ...entry,
+        hpMult: (entry.hpMult ?? 1) * phaseHpMult,
+      }
+    }),
+  }
+}
+
 export const STAGES: StageConfig[] = RAW_STAGES.map((rawStage, index) => {
-  const stage = index < 7 ? compressSpawnSchedule(rawStage, 20) : rawStage
+  const compressedStage = index < 7 ? compressSpawnSchedule(rawStage, 20) : rawStage
+  const bossStage = addBossVanguard(pullBossEscortsForward(compressedStage))
+  const pressureStage = addLatcherPressure(bossStage)
+  const phaseStage = applyPhasePressure(pressureStage)
+  const stage = spreadBarricadeAssaultWaves(phaseStage)
   return {
     ...stage,
     enemyHpMult: STAGE_ENEMY_HP_MULTS[index] ?? 1,
