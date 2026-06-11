@@ -89,6 +89,7 @@ Example:
 
 - Keep cost and cap tables centralized so later balance changes are easy.
 - Keep name formatting centralized so all inventory, equipment, shop, and result UI use the same display.
+- Keep effect description formatting centralized so displayed values follow the current enhancement level.
 - Existing sale behavior should remain recognizable; junk parts are an additional reward, not a replacement for credits.
 
 ## First Implementation Notes
@@ -98,6 +99,7 @@ Example:
 - `GameSave.junkParts` stores the new currency and defaults to `0` for old saves.
 - The shop upgrade screen only lists equipment whose slot is `weapon`.
 - Enhancement effects apply only to the bonus portion of weapon-slot equipment.
+- Equipment effect descriptions are generated from stat fields and current enhancement level instead of using fixed master-data description strings.
 - Core, sensor, and module levels are not upgraded in the first pass.
 - Selling equipment grants credits plus rarity-based junk parts.
 - Selling upgraded weapons does not refund spent enhancement cost.

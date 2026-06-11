@@ -47,7 +47,7 @@ export class Barricade {
   }
 
   heal(ratio: number) {
-    this.hp = Math.min(this.maxHp, this.hp + Math.floor(this.maxHp * ratio))
+    this.hp = Math.min(this.maxHp, this.hp + this.maxHp * ratio)
     this.updateBar()
   }
 

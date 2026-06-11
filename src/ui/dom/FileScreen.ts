@@ -1,7 +1,7 @@
 import { ENEMIES } from '../../data/enemies'
 import { WEAPONS } from '../../data/weapons'
 import { loadSave } from '../../systems/SaveData'
-import { equipmentDisplayName } from '../../systems/EquipmentEnhancement'
+import { equipmentDisplayName, equipmentEffectDescription } from '../../systems/EquipmentEnhancement'
 import { edgeButton, emptyState, listRow, scrollList } from './components'
 import type { DomScreen } from './mount'
 
@@ -101,7 +101,7 @@ export function mountFileScreen(root: HTMLElement, opts: FileScreenOptions): Dom
         icon: weapon.emoji,
         iconColor: slotColor(weapon.slot),
         title: equipmentDisplayName(weapon.name, owned.level),
-        detail: weapon.description,
+        detail: equipmentEffectDescription(weapon, owned.level),
         meta: weapon.rarity,
       }))
     })

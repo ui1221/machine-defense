@@ -29,6 +29,32 @@ export function equipmentDisplayName(name: string, level: number) {
   return level > 0 ? `${name} +${level}` : name
 }
 
+export function equipmentEffectDescription(weapon: WeaponConfig, level: number) {
+  const bonus = enhancementBonusMultiplier(weapon, level)
+  const parts: string[] = []
+
+  if (weapon.atkMult !== 1) {
+    parts.push(`${STAT_LABELS.atk} ${formatSignedPercent((enhancedMultiplier(weapon.atkMult, bonus) - 1) * 100)}`)
+  }
+  if (weapon.atkSpeedMult !== 1) {
+    const speedMult = weapon.atkSpeedMult < 1
+      ? enhancedMultiplier(weapon.atkSpeedMult, bonus)
+      : weapon.atkSpeedMult
+    parts.push(`${STAT_LABELS.cooldown} ${formatSignedPercent((speedMult - 1) * 100)}`)
+  }
+  if (weapon.rangeMult !== 1) {
+    parts.push(`${STAT_LABELS.range} ${formatSignedPercent((enhancedMultiplier(weapon.rangeMult, bonus) - 1) * 100)}`)
+  }
+  if (weapon.areaMult && weapon.areaMult !== 1) {
+    parts.push(`${STAT_LABELS.area} ${formatSignedPercent((enhancedMultiplier(weapon.areaMult, bonus) - 1) * 100)}`)
+  }
+  if (weapon.critChance > 0) {
+    parts.push(`${STAT_LABELS.crit} ${formatSignedPercent(weapon.critChance * bonus * 100)}`)
+  }
+
+  return parts.length > 0 ? parts.join(' / ') : weapon.description
+}
+
 export function isEnhanceableEquipment(owned: OwnedWeapon) {
   return WEAPONS[owned.weaponId]?.slot === 'weapon'
 }
@@ -69,4 +95,28 @@ function applyEquipmentBonus(result: EquipmentStatBonus, weapon: WeaponConfig, o
   if (weapon.rangeMult !== 1) result.rangeMult *= 1 + (weapon.rangeMult - 1) * bonus
   if (weapon.areaMult && weapon.areaMult !== 1) result.areaMult *= 1 + (weapon.areaMult - 1) * bonus
   if (weapon.critChance > 0) result.critAdd += weapon.critChance * bonus
+}
+
+function enhancementBonusMultiplier(weapon: WeaponConfig, level: number) {
+  if (weapon.slot !== 'weapon') return 1
+  const enhancementLevel = Math.max(0, Math.min(level, ENHANCEMENT_MAX_LEVEL[weapon.rarity]))
+  return 1 + enhancementLevel * 0.1
+}
+
+function enhancedMultiplier(multiplier: number, bonus: number) {
+  return 1 + (multiplier - 1) * bonus
+}
+
+function formatSignedPercent(value: number) {
+  const rounded = Math.round(value * 10) / 10
+  const text = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)
+  return rounded > 0 ? `+${text}%` : `${text}%`
+}
+
+const STAT_LABELS = {
+  atk: '\u653b\u6483',
+  cooldown: '\u30af\u30fc\u30eb\u30bf\u30a4\u30e0',
+  range: '\u5c04\u7a0b',
+  area: '\u653b\u6483\u7bc4\u56f2',
+  crit: '\u4f1a\u5fc3\u7387',
 }

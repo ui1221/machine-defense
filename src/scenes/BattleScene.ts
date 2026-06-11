@@ -33,6 +33,7 @@ const BEAM_SLOW_FACTOR = 0.78
 const CRIT_MULT = 2.5
 const RAILGUN_KNOCKBACK_DIST = 80
 const ORB_KNOCKBACK_DIST = 8
+const LEVEL_UP_BARRICADE_HEAL_RATIO = 0.04
 
 export class BattleScene extends Phaser.Scene {
   characters: Character[] = []
@@ -790,6 +791,8 @@ export class BattleScene extends Phaser.Scene {
 
   private onLevelUp() {
     if (!this.levelUpManager.consumePendingLevelUp()) return
+    this.barricade.heal(LEVEL_UP_BARRICADE_HEAL_RATIO)
+    this.events.emit('battleUpdate')
     this.scene.pause()
     this.inputManager.pause()
     const state = this.buildBattleState()

@@ -56,6 +56,7 @@ Recent work after the older 2026-05-28 handoff includes:
 - A new barricade-pressure enemy role (`latcher`) was added and inserted into later-stage pressure patterns.
 - Enemy barricade attacks now support per-enemy first attack delay, cooldown, and jitter.
 - Barricade damage can be fractional; the battle HUD rounds displayed HP up to avoid long decimal strings.
+- Each consumed battle level-up heals the barricade by 4% of max HP, capped at max HP.
 - Boss durability and control resistance were increased.
 - Boss escort composition was adjusted so slow escorts are replaced with faster vanguard-style enemies near boss timing.
 - Late-stage HP pressure now changes by phase:
@@ -111,6 +112,7 @@ Implemented behavior:
   - `SR`: +7
   - `SSR`: +10
 - Each enhancement level increases the weapon bonus portion by 10%.
+- Equipment effect descriptions are generated from stat fields and current enhancement level, so displayed effect amounts follow enhancement.
 - Enhancement logic is centralized in `src/systems/EquipmentEnhancement.ts`.
 - The top status displays both credits and junk parts.
 - The shop upgrade screen marks equipped weapons with `E` in the level subtitle, e.g. `E +2/+5`.

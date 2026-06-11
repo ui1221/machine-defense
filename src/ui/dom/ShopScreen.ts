@@ -4,6 +4,7 @@ import { loadSave, saveGame } from '../../systems/SaveData'
 import {
   enhancementMaxLevel,
   equipmentDisplayName,
+  equipmentEffectDescription,
   isEnhanceableEquipment,
   nextEnhancementCost,
   sellJunkParts,
@@ -125,11 +126,11 @@ export function mountShopScreen(root: HTMLElement, opts: ShopScreenOptions): Dom
         icon: weapon.emoji,
         iconColor: rarityColor(weapon.rarity),
         title: weapon.name,
-        detail: compactEquipmentDescription(weapon.description),
+        detail: equipmentEffectDescription(weapon, 0),
         meta: `${price} CREDIT`,
         disabled: save.credits < price,
         onClick: () => showConfirm(
-          `${weapon.name}\n${compactEquipmentDescription(weapon.description)}\n${price} CREDIT で購入します。`,
+          `${weapon.name}\n${equipmentEffectDescription(weapon, 0)}\n${price} CREDIT で購入します。`,
           () => {
             const current = loadSave()
             if (current.credits < price) return
@@ -166,7 +167,7 @@ export function mountShopScreen(root: HTMLElement, opts: ShopScreenOptions): Dom
         icon: weapon.emoji,
         iconColor: rarityColor(weapon.rarity),
         title: equipmentDisplayName(weapon.name, owned.level),
-        detail: compactEquipmentDescription(weapon.description),
+        detail: equipmentEffectDescription(weapon, owned.level),
         meta: `${price} CREDIT + ${junk} JUNK`,
         onClick: () => showConfirm(
           `${equipmentDisplayName(weapon.name, owned.level)}\n${price} CREDIT + ${junk} JUNK で売却します。`,
@@ -217,7 +218,7 @@ export function mountShopScreen(root: HTMLElement, opts: ShopScreenOptions): Dom
         iconColor: rarityColor(weapon.rarity),
         title: equipmentDisplayName(weapon.name, currentLevel),
         subTitle: `${equipMark}+${currentLevel}/+${maxLevel}`,
-        detail: compactEquipmentDescription(weapon.description),
+        detail: equipmentEffectDescription(weapon, currentLevel),
         meta: maxed ? 'MAX' : `${cost} JUNK`,
         disabled: !canEnhance,
         onClick: () => showConfirm(
@@ -370,16 +371,6 @@ function enhanceEquipment(uid: string, cost: number, maxLevel: number) {
   target.level = currentLevel + 1
   saveGame(save)
   return true
-}
-
-function compactEquipmentDescription(description: string) {
-  return description
-    .replace(/攻撃力/g, '攻撃')
-    .replace(/クールタイム/g, '冷却')
-    .replace(/索敵範囲/g, '範囲')
-    .replace(/会心率/g, '会心')
-    .replace(/(攻撃|冷却|範囲|会心)\s+([+-])/g, '$1$2')
-    .replace(/\s*\/\s*/g, '　')
 }
 
 function rarityColor(rarity: keyof typeof RARITY_COLORS) {

@@ -1,7 +1,7 @@
 import { CHARACTERS, PLAYABLE_CHARACTER_IDS } from '../../data/characters'
 import { canEquipWeaponToCharacter, equipmentSlotLabel, RARITY_COLORS, WEAPONS } from '../../data/weapons'
 import { loadSave, saveGame, upgradeCost } from '../../systems/SaveData'
-import { equipmentDisplayName, equipmentStatBonus } from '../../systems/EquipmentEnhancement'
+import { equipmentDisplayName, equipmentEffectDescription, equipmentStatBonus } from '../../systems/EquipmentEnhancement'
 import type { EquipmentSlot, GameSave, OwnedWeapon } from '../../types'
 import { edgeButton, emptyState, listRow, scrollList } from './components'
 import type { DomScreen } from './mount'
@@ -133,7 +133,7 @@ export function mountCharacterScreen(root: HTMLElement, opts: CharacterScreenOpt
       actions.append(edgeButton({
         icon: weapon?.emoji ?? '>',
         title: weapon && equipped ? equipmentDisplayName(weapon.name, equipped.level) : equipmentSlotLabel(slot),
-        desc: weapon ? compactEquipmentDescription(weapon.description) : '空き',
+        desc: weapon && equipped ? equipmentEffectDescription(weapon, equipped.level) : '空き',
         onClick: () => {
           selectingSlot = slot
           render()
@@ -197,7 +197,7 @@ export function mountCharacterScreen(root: HTMLElement, opts: CharacterScreenOpt
           icon: weapon.emoji,
           iconColor: rarityColor(weapon.rarity),
           title: equipmentDisplayName(weapon.name, owned.level),
-          detail: compactEquipmentDescription(weapon.description),
+          detail: equipmentEffectDescription(weapon, owned.level),
           meta: owned.uid === current?.uid ? '装備中' : equippedOwner ? `${equippedOwner} 装備中` : weapon.rarity,
           disabled: equippedByOther,
           onClick: () => {
@@ -322,16 +322,6 @@ function unequipCharacterWeapon(charId: string, slot: EquipmentSlot) {
 function formatStatBonus(value: number, digits: number) {
   if (Math.abs(value) < 0.005) return ''
   return value > 0 ? `+${value.toFixed(digits)}` : `-${Math.abs(value).toFixed(digits)}`
-}
-
-function compactEquipmentDescription(description: string) {
-  return description
-    .replace(/攻撃力/g, '攻撃')
-    .replace(/クールタイム/g, '冷却')
-    .replace(/索敵範囲/g, '範囲')
-    .replace(/会心率/g, '会心')
-    .replace(/(攻撃|冷却|範囲|会心)\s+([+-])/g, '$1$2')
-    .replace(/\s*\/\s*/g, '　')
 }
 
 function rarityColor(rarity: keyof typeof RARITY_COLORS) {
